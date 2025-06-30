@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>农户管理 - 无人机过度放牧检测系统</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/farmers.css">
+    <link rel="stylesheet" href="styles/import-progress.css">
+    <!-- <link rel="stylesheet" href="styles/custom-icons.css"> -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部导航 -->
+        <header class="header">
+            <div class="header-content">
+<h1><i class="fas fa-helicopter"></i> 无人机过度放牧检测系统</h1>
+                <div class="header-actions">
+                    <button class="btn btn-success" id="addFarmerBtn">
+                        <i class="fas fa-user-plus"></i> 添加农户
+                    </button>
+                    <button class="btn btn-primary" id="galleryBtn" onclick="window.location.href='detection.html'">
+                        <i class="fas fa-images"></i> 图库
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <main class="main-content farmers-main">
+            <!-- 农户列表 -->
+            <div class="farmers-list-container" id="farmersListContainer">
+                <div class="farmers-list-header" style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 16px;">
+                    <h3 style="margin: 0;">农户列表</h3>
+                    <span class="farmers-count" id="farmersCount" style="margin-right:auto;">共 0 户</span>
+                    <div class="search-input-wrapper" style="flex:1; min-width:220px;">
+                        <i class="fas fa-search"></i>
+<input type="text" id="farmerSearchInput" placeholder="搜索农户姓名、电话、身份证号或地址..." autocomplete="off">
+                        <!-- 清除按钮已移除，直接用键盘清除 -->
+                    </div>
+                    <div class="search-filters" style="min-width:160px;">
+                        <select id="sortBy" class="form-control-sm">
+                            <option value="name">按姓名</option>
+                            <option value="recent">按最近检测</option>
+                            <option value="sheep_count">按羊群数量</option>
+                            <option value="cattle_count">按牛群数量</option>
+                            <option value="total_livestock">按牛羊总数</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 加载状态 -->
+                <div class="loading" id="farmersLoadingSpinner" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>正在加载农户信息...</p>
+                </div>
+                
+                <!-- 农户列表 -->
+                <div class="farmers-list" id="farmersList">
+                    <!-- 农户卡片将动态生成 -->
+                </div>
+                
+                <!-- 空状态 -->
+                <div class="empty-state" id="farmersEmptyState" style="display: none;">
+                    <i class="fas fa-user-friends"></i>
+                    <h3>暂无农户</h3>
+                    <p>点击上方"添加农户"按钮开始添加农户信息</p>
+                </div>
+            </div>
+
+            <!-- 农户详情面板 -->
+            <div class="farmer-details-panel" id="farmerDetailsPanel" style="display: none;">
+                <div class="panel-header">
+                    <button class="btn btn-sm btn-secondary" id="backToListBtn">
+                        <i class="fas fa-arrow-left"></i> 返回列表
+                    </button>
+                    <div class="panel-actions">
+                        <button class="btn btn-sm btn-secondary" id="editFarmerBtn">
+                            <i class="fas fa-edit"></i> 编辑
+                        </button>
+                        <button class="btn btn-sm btn-primary" id="newDetectionBtn">
+                            <i class="fas fa-camera"></i> 新建盘点
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 农户基本信息 -->
+                <div class="farmer-info-section">
+                    <div class="farmer-basic-info">
+                        <h2 id="farmerName">农户姓名</h2>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <i class="fas fa-id-card"></i>
+                                <span>身份证号：</span><span id="farmerIdCard">身份证号</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-phone"></i>
+                                <span>联系电话：</span><span id="farmerPhone">联系电话</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span>地址：</span>
+                                <span id="farmerProvince">省</span>
+                                <span id="farmerCity">市</span>
+<span id="farmerCounty">县</span>
+<span id="farmerTown">乡</span>
+<span id="farmerVillage">村</span>
+                            </div>
+                            <div class="info-item">
+                                <i class="fas fa-location-dot"></i>
+                                <span>详细地址：</span><span id="farmerDetailAddress">详细地址</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="emoji-icon">🐑</span>
+                                <span>羊群数量：</span><span id="farmerSheepCount">羊群数量</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="emoji-icon">🐄</span>
+                                <span>牛群数量：</span><span id="farmerCattleCount">牛群数量</span>
+                            </div>
+<div class="info-item">
+    <span class="emoji-icon">🐎</span>
+    <span>马数量：</span><span id="farmerHorseCount">马数量</span>
+</div>
+<div class="info-item">
+    <span class="emoji-icon">🌱</span>
+    <span>草场亩数：</span><span id="farmerPastureArea">草场亩数</span>
+</div>
+                            <div class="info-item">
+                                <span class="emoji-icon">🌾</span>
+                                <span>人工饲草地亩数：</span><span id="farmerFodderArea">人工饲草地亩数</span>
+                            </div>
+<div class="info-item">
+                                <i class="fas fa-chart-bar"></i>
+                                <span>检测次数：</span><span id="totalDetections"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 统计信息 -->
+                <div class="farmer-stats-section">
+                    <div class="stats-grid">
+                        <div class="stat-card stat-card-wide">
+                            <div class="stat-number" id="lastDetectionDate">未检测</div>
+                            <div class="stat-label">最近检测</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="farmerSheepCountStat">0</div>
+                            <div class="stat-label">最近羊数量</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="farmerCattleCountStat">0</div>
+                            <div class="stat-label">最近牛数量</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="overgrazingRisk">低</div>
+                            <div class="stat-label">过度放牧风险</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 备注信息 -->
+                <div class="farmer-notes-section">
+                    <div class="section-header">
+                        <h3><i class="fas fa-sticky-note"></i> 备注信息</h3>
+                    </div>
+                    <div class="notes-content" id="farmerNotes">
+                        暂无备注信息
+                    </div>
+                </div>
+
+                <!-- 历史盘点记录 -->
+                <div class="detection-history-section">
+                    <div class="section-header">
+                        <h3>
+                            <i class="fas fa-history"></i>
+                            历史盘点记录
+                        </h3>
+                        <div class="history-controls">
+                            <select id="historyFilter" class="form-control-sm">
+                                <option value="">全部状态</option>
+                                <option value="completed">已完成</option>
+                                <option value="processing">处理中</option>
+                                <option value="failed">失败</option>
+                            </select>
+                            <select id="historySort" class="form-control-sm">
+                                <option value="date_desc">最新在前</option>
+                                <option value="date_asc">最旧在前</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 检测任务列表 -->
+                    <div class="detection-tasks-list" id="detectionTasksList">
+                        <!-- 任务文件夹卡片将动态生成 -->
+                    </div>
+
+                    <!-- 空状态 -->
+                    <div class="empty-state" id="detectionHistoryEmpty" style="display: none;">
+                        <i class="fas fa-camera"></i>
+                        <h4>暂无检测记录</h4>
+                        <p>点击"新建盘点"开始第一次盘点</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 移动端模态框遮罩
+    <div class="farmer-details-overlay" id="farmerDetailsOverlay"></div> -->
+
+    <!-- 添加/编辑农户模态框 -->
+    <div class="modal" id="farmerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="farmerModalTitle">添加农户</h2>
+                <button class="modal-close" id="closeFarmerModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="farmerForm">
+                    <div class="form-group">
+                        <label>农户姓名 <span class="required">*</span></label>
+<input type="text" id="inputFarmerName" required placeholder="请输入农户姓名">
+                    </div>
+                    <div class="form-group">
+                        <label>联系电话</label>
+<input type="tel" id="inputFarmerPhone" placeholder="请输入联系电话">
+                    </div>
+                    <div class="form-group">
+                        <label>身份证号</label>
+<input type="text" id="inputFarmerIdCard" placeholder="请输入身份证号">
+                    </div>
+<div class="form-row">
+    <div class="form-group">
+        <label>省</label>
+<input type="text" id="inputFarmerProvince" placeholder="如：内蒙古自治区">
+    </div>
+    <div class="form-group">
+        <label>市</label>
+<input type="text" id="inputFarmerCity" placeholder="如：呼和浩特市">
+    </div>
+    <div class="form-group">
+        <label>县</label>
+<input type="text" id="inputFarmerCounty" placeholder="如：托克托县">
+    </div>
+    <div class="form-group">
+        <label>乡</label>
+<input type="text" id="inputFarmerTown" placeholder="如：双河镇">
+    </div>
+    <div class="form-group">
+        <label>村</label>
+<input type="text" id="inputFarmerVillage" placeholder="如：新农村">
+    </div>
+</div>
+                    <div class="form-group">
+                        <label>详细地址</label>
+<input type="text" id="inputFarmerDetailAddress" placeholder="如：村东头23号">
+                    </div>
+<div class="form-row">
+    <div class="form-group">
+        <label>羊群数量</label>
+<input type="number" id="inputSheepCount" min="0" placeholder="请输入羊群数量">
+    </div>
+    <div class="form-group">
+        <label>牛群数量</label>
+<input type="number" id="inputCattleCount" min="0" placeholder="请输入牛群数量">
+    </div>
+    <div class="form-group">
+        <label>马数量</label>
+<input type="number" id="inputHorseCount" min="0" placeholder="请输入马数量">
+    </div>
+</div>
+<div class="form-row">
+    <div class="form-group">
+        <label>草场亩数</label>
+<input type="number" id="inputPastureArea" min="0" step="0.01" placeholder="请输入草场亩数">
+    </div>
+    <div class="form-group">
+        <label>人工饲草地亩数</label>
+<input type="number" id="inputFodderArea" min="0" step="0.01" placeholder="请输入人工饲草地亩数">
+    </div>
+</div>
+                    <div class="form-group">
+                        <label>备注</label>
+<textarea id="inputFarmerNotes" rows="3" placeholder="可填写备注信息"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="cancelFarmerBtn">取消</button>
+                        <button type="submit" class="btn btn-primary" id="saveFarmerBtn">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 检测任务详情模态框 -->
+    <div class="modal" id="taskDetailModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="taskDetailTitle">检测任务详情</h2>
+                <button class="modal-close" id="closeTaskDetailModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="taskDetailContent">
+                    <!-- 任务详情内容将动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript文件 -->
+    <script src="scripts/notification.js"></script>
+    <script src="scripts/loading-manager.js"></script>
+    <script src="scripts/config.js"></script>
+    <script src="scripts/dialog.js"></script>
+    <script src="scripts/farmers-manager.js"></script>
+    <script src="scripts/farmers-app.js"></script>
+    <script src="scripts/import-manager.js"></script>
+<!-- 临时文件夹弹窗 -->
+<div id="tempCheckModal" style="display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:9999;background:rgba(0,0,0,0.35);align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:32px 24px;border-radius:8px;max-width:90vw;min-width:320px;box-shadow:0 2px 16px #0002;text-align:center;">
+    <h2 style="margin-bottom:16px;">检测到有未完成的新建临时文件夹</h2>
+    <p style="margin-bottom:24px;">是否继续上次未完成的临时文件夹？</p>
+    <button id="continueTempCheckBtn" style="margin-right:16px;padding:8px 24px;">继续</button>
+    <button id="deleteTempCheckBtn" style="padding:8px 24px;">删除</button>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/temp-folder')
+    .then(res => res.json())
+    .then(data => {
+      if (data && Array.isArray(data.images) && data.images.length > 0) {
+        // 显示弹窗
+        document.getElementById('tempCheckModal').style.display = 'flex';
+        // 继续按钮
+        document.getElementById('continueTempCheckBtn').onclick = function() {
+          window.location.href = 'detection.html?farmerId=1';
+        };
+        // 删除按钮
+        document.getElementById('deleteTempCheckBtn').onclick = function() {
+          fetch('/api/temp-folder', { method: 'DELETE' })
+            .then(() => window.location.reload());
+        };
+      }
+    });
+});
+</script>
+</body>
+</html>

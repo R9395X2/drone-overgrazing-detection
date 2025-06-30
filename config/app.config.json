@@ -1,0 +1,18 @@
+{
+  "imageLibrary": {
+    "path": "D:\\drone-overgrazing-detection\\MediaGallery",
+    "autoCreate": true,
+    "copyOriginals": true,
+    "classifyByDate": false
+  },
+  "ui": {
+    "autoLoadDirectory": true,
+    "defaultView": "grid",
+    "theme": "default"
+  },
+  "import": {
+    "preserveStructure": true,
+    "addTimestamp": false,
+    "conflictResolution": "rename"
+  }
+}

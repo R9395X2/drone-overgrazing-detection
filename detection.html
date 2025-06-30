@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建盘点-文件导入</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/folder-browser.css">
+    <link rel="stylesheet" href="styles/device-dialog.css">
+    <link rel="stylesheet" href="styles/settings.css">
+    <link rel="stylesheet" href="styles/import-progress.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部导航 -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-helicopter"></i> 无人机过度放牧检测系统</h1>
+                <div class="header-actions">
+                    <button class="btn btn-success" id="homeBtn" onclick="window.location.href='index.html'">
+                        <i class="fas fa-home"></i> 回到首页
+                    </button>
+                    <button class="btn btn-secondary" id="selectFolderBtn">
+                        <i class="fas fa-folder-open"></i> 选择文件夹
+                    </button>
+                    <button class="btn btn-primary" id="autoDetectBtn">
+                        <i class="fas fa-usb"></i> 自动检测设备
+                    </button>
+                    <button class="btn btn-primary" id="editCheckInfoBtn" type="button" style="margin-left:12px;">
+                        <i class="fas fa-edit"></i> 编辑盘点信息
+                    </button>
+                    <button class="btn btn-success" id="startCountBtnHeader" type="button" style="margin-left:12px;display:none;">
+                        <i class="fas fa-calculator"></i> 开始计数
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <!-- 状态栏 -->
+            <div class="status-bar">
+<div class="status-info" style="display:flex;gap:32px;flex-wrap:wrap;align-items:center;">
+    <span id="imageCount" style="font-size:13px;line-height:1.2;"></span>
+    <span id="currentImagePath" style="font-size:13px;line-height:1.2;"></span>
+    <span>姓名：<span id="farmerName">-</span></span>
+    <span id="summaryInfo" style="font-size:13px;line-height:1.2;color:#1a8917;font-weight:bold;"></span>
+</div>
+                <div class="gallery-controls">
+                    <!-- 排序和分类选项 -->
+                    <div class="sort-filter-controls">
+                        <div class="control-group">
+                            <label for="sortBy">排序方式:</label>
+                            <select id="sortBy" class="form-control-sm">
+                                <option value="date">按拍摄时间</option>
+                                <option value="name">按文件名</option>
+                                <option value="size">按文件大小</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="groupBy">分类方式:</label>
+                            <select id="groupBy" class="form-control-sm">
+                                <option value="date">按拍摄时间</option>
+                                <option value="folder">按文件夹</option>
+                                <option value="none">不分类</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <button class="btn btn-sm" id="sortOrderBtn" title="切换排序顺序">
+                                <i class="fas fa-sort-amount-down" id="sortOrderIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- 视图切换 -->
+                    <div class="view-toggle">
+                        <button class="btn btn-sm" id="gridViewBtn" title="网格视图">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button class="btn btn-sm" id="listViewBtn" title="列表视图">
+                            <i class="fas fa-list"></i>
+                        </button>
+                    </div>
+                    <!-- 多选和删除按钮，靠右 -->
+<div class="multi-select-controls" style="display:flex;gap:12px;align-items:center;margin-left:auto;">
+    <button class="btn btn-sm btn-secondary" id="toggleSelectModeBtn">
+        <i class="fas fa-check-square"></i> 选择图片
+    </button>
+    <button class="btn btn-sm btn-danger" id="deleteSelectedBtn" style="display:none;">
+        <i class="fas fa-trash"></i> 删除所选
+    </button>
+    <span id="selectedCount" style="font-size:13px;color:#888;display:none;"></span>
+    
+</div>
+                </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div class="loading" id="loadingSpinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>正在加载图片...</p>
+            </div>
+
+            
+            <!-- 图片列表容器 -->
+            <div class="image-gallery" id="imageGallery">
+                <!-- 空状态 -->
+                <div class="empty-state" id="emptyState">
+                    <i class="fas fa-images"></i>
+                    <h3>暂无图片</h3>
+                    <p>请选择包含图片的文件夹或连接无人机设备</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 图片处理模态框 -->
+        <div class="modal" id="processModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>图片处理</h2>
+                    <button class="modal-close" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="image-preview">
+                        <img id="previewImage" src="" alt="预览图片">
+                        <div class="image-info">
+                            <p id="imageName">图片名称</p>
+                            <p id="imageSize">文件大小</p>
+                        </div>
+                    </div>
+                    <div class="process-controls">
+                        <div class="process-options">
+                            <h3>处理选项</h3>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="detectOvergrazing" checked>
+                                <span>过度放牧检测</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="generateReport">
+                                <span>生成详细报告</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="saveResults" checked>
+                                <span>保存处理结果</span>
+                            </label>
+                        </div>
+                        <div class="process-actions">
+                            <button class="btn btn-primary btn-large" id="startProcessBtn">
+                                <i class="fas fa-play"></i> 开始处理
+                            </button>
+                            <button class="btn btn-secondary" id="cancelProcessBtn">
+                                <i class="fas fa-times"></i> 取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 处理结果模态框 -->
+        <div class="modal" id="resultModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h2>处理结果</h2>
+                    <button class="modal-close" id="closeResultModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="result-content" id="resultContent">
+                        <!-- 处理结果将动态加载到这里 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 处理进度模态框 -->
+        <div class="modal" id="progressModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>正在处理...</h2>
+                </div>
+                <div class="modal-body">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p id="progressText">准备中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 盘点信息弹窗（采用overlay结构，放在body最外层） -->
+    <div class="custom-dialog-overlay" id="checkInfoOverlay">
+        <div class="modal-content settings-modal" style="max-width:520px;padding:0;">
+            <div class="settings-header" style="border-radius:15px 15px 0 0;">
+                <h3 style="margin:0;font-size:1.3rem;display:flex;align-items:center;gap:10px;">
+                    <i class="fas fa-tasks" style="font-size:1.2em;"></i>
+                    编辑盘点信息
+                </h3>
+                <button class="modal-close" id="closeCheckInfoModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-body" style="padding:32px 28px 24px 28px;">
+                <form id="checkInfoForm" autocomplete="off">
+                    <div class="setting-item" style="margin-bottom:22px;">
+                        <label for="taskName">盘点名称</label>
+                        <input type="text" id="taskName" name="task_name" class="form-control" placeholder="请输入盘点名称" required>
+                    </div>
+                    <div class="setting-item" style="margin-bottom:22px;">
+                        <label for="detectionDate">盘点日期</label>
+                        <input type="date" id="detectionDate" name="detection_date" class="form-control" required>
+                    </div>
+                    <div class="setting-item" style="margin-bottom:22px;">
+                        <label for="checkNotes">备注</label>
+                        <textarea id="checkNotes" name="notes" class="form-control" rows="3" placeholder="可填写备注信息"></textarea>
+                    </div>
+                    <div class="settings-footer" style="padding:0;background:none;border:none;justify-content:flex-end;">
+                        <button class="btn btn-primary" type="submit" style="min-width:120px;">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- 按依赖顺序加载模块化的JavaScript文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/tiff@0.16.0/dist/tiff.min.js"></script>
+    <script src="scripts/notification.js"></script>
+    <script src="scripts/loading-manager.js"></script>
+    <script src="scripts/config.js"></script>
+    <script src="scripts/dialog.js"></script>
+    <script src="scripts/folder-browser.js"></script>
+    <script src="scripts/device-detection.js"></script>
+    <script src="scripts/import-manager.js"></script>
+    <script src="scripts/image-manager.js"></script>
+    <script src="scripts/settings.js"></script>
+    <script src="scripts/app.js"></script>
+    
+    <!-- 保持向后兼容，但现在main.js只包含遗留代码 -->
+    <script src="scripts/main.js"></script>
+<script>
+// 头部“开始计数”按钮跳转
+document.getElementById('startCountBtnHeader')?.addEventListener('click', function() {
+    const params = new URLSearchParams(window.location.search);
+    let farmerId = params.get('farmerId') || params.get('farmer_id');
+    let url = 'count.html';
+    if (farmerId) {
+        url += '?farmerId=' + encodeURIComponent(farmerId);
+    }
+    window.location.href = url;
+});
+// 页面加载时确保temp_folder及子文件夹创建
+fetch('/api/temp-folder').catch(()=>{});
+// 只有参数中带有farmerId时才显示“选择文件夹”“自动检测设备”“开始计数”按钮，否则隐藏
+(function() {
+    function hasParam(names) {
+        const search = window.location.search;
+        for (const name of names) {
+            const reg = new RegExp('[?&]' + name + '=([^&#]*)', 'i');
+            if (search.match(reg)) return true;
+        }
+        return false;
+    }
+    var btns = [
+        document.getElementById('selectFolderBtn'),
+        document.getElementById('autoDetectBtn')
+    ];
+    var editBtn = document.getElementById('editCheckInfoBtn');
+    var startCountBtnHeader = document.getElementById('startCountBtnHeader');
+    if (!hasParam(['farmerId', 'farmer_id'])) {
+        btns.forEach(function(btn) {
+            if (btn) btn.style.display = 'none';
+        });
+        if (startCountBtnHeader) startCountBtnHeader.style.display = 'none';
+    } else {
+        if (startCountBtnHeader) startCountBtnHeader.style.display = '';
+    }
+    if (!hasParam(['farmerId', 'farmer_id', 'taskId'])) {
+        if (editBtn) editBtn.style.display = 'none';
+    } else {
+        if (editBtn) editBtn.style.display = '';
+    }
+})();
+</script>
+</body>
+</html>

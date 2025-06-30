@@ -1,0 +1,404 @@
+/* 导入进度模态框样式 */
+.import-progress-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.import-progress-overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.import-progress-modal {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow: hidden;
+    transform: scale(0.9) translateY(-20px);
+    transition: all 0.3s ease;
+}
+
+.import-progress-overlay.show .import-progress-modal {
+    transform: scale(1) translateY(0);
+}
+
+.import-progress-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 24px;
+    text-align: center;
+}
+
+.import-progress-header h3 {
+    margin: 0;
+    font-size: 1.5em;
+    font-weight: 600;
+}
+
+.import-progress-header i {
+    margin-right: 10px;
+    font-size: 1.2em;
+}
+
+.import-progress-body {
+    padding: 30px;
+}
+
+.progress-container {
+    margin-bottom: 25px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 12px;
+    background: #f0f0f0;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+    border-radius: 6px;
+    width: 0%;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.progress-fill.analyzing {
+    background: linear-gradient(90deg, #2196F3, #1976D2);
+}
+
+.progress-fill.copying {
+    background: linear-gradient(90deg, #FF9800, #F57C00);
+}
+
+.progress-fill.completed {
+    background: linear-gradient(90deg, #4CAF50, #45a049);
+}
+
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.progress-message {
+    background: #f8f9fa;
+    border-left: 4px solid #007bff;
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-weight: 500;
+}
+
+.progress-details {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 15px;
+}
+
+.progress-phase {
+    display: flex;
+    align-items: center;
+    color: #856404;
+}
+
+.progress-phase i {
+    margin-right: 10px;
+    color: #f39c12;
+}
+
+/* 导入完成对话框样式 */
+.import-completed-dialog {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+    max-width: 600px;
+}
+
+.completed-header {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+.completed-icon {
+    font-size: 3em;
+    margin-bottom: 15px;
+}
+
+.completed-header h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.8em;
+    font-weight: 600;
+}
+
+.completed-header p {
+    margin: 0;
+    opacity: 0.9;
+    font-size: 1.1em;
+}
+
+.completed-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 25px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #4CAF50;
+    margin-bottom: 5px;
+}
+
+.stat-item.error .stat-number {
+    color: #f44336;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.usb-removal-notice {
+    padding: 25px;
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-left: 5px solid #2196F3;
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.usb-icon {
+    font-size: 2.5em;
+    color: #2196F3;
+    margin-right: 20px;
+    flex-shrink: 0;
+}
+
+.usb-message h4 {
+    margin: 0 0 10px 0;
+    color: #1976D2;
+    font-size: 1.3em;
+    font-weight: 600;
+}
+
+.usb-message p {
+    margin: 0;
+    color: #333;
+    line-height: 1.5;
+}
+
+.completed-actions {
+    padding: 25px;
+    text-align: center;
+    background: white;
+}
+
+.completed-actions .btn {
+    min-width: 120px;
+    padding: 12px 24px;
+    font-size: 1.1em;
+    font-weight: 600;
+}
+
+/* 设备对话框增强样式 */
+.device-selection-dialog.enhanced {
+    width: 100%;
+    max-width: 800px;
+}
+
+.dialog-subtitle {
+    margin: 8px 0 0 0;
+    font-size: 0.9em;
+    color: #666;
+    font-style: italic;
+}
+
+.device-header i.fa-helicopter {
+    color: #2196F3;
+}
+
+.subfolder-status .import-badge {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: 500;
+}
+
+.subfolder-item:hover .import-badge {
+    background: linear-gradient(135deg, #45a049, #388e3c);
+    transform: scale(1.05);
+}
+
+/* 图片卡片文件夹信息 */
+.image-folder {
+    font-size: 0.75em;
+    color: #666;
+    background: #f0f0f0;
+    padding: 3px 8px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    display: inline-block;
+}
+
+/* 禁用选择文件夹弹窗横向滚动条，内缩纵向滚动条 */
+.drive-subfolders-dialog {
+    overflow-x: hidden !important;
+}
+
+.subfolder-list {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f0f0f0;
+}
+.subfolder-list::-webkit-scrollbar {
+    width: 10px;
+    background: #f0f0f0;
+}
+.subfolder-list::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 8px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .import-progress-modal {
+        margin: 20px;
+        width: calc(100% - 40px);
+    }
+    
+    .import-progress-header {
+        padding: 20px;
+    }
+    
+    .import-progress-body {
+        padding: 20px;
+    }
+    
+    .completed-stats {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .usb-removal-notice {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .usb-icon {
+        margin-right: 0;
+        margin-bottom: 15px;
+    }
+    
+    .dialog-subtitle {
+        display: none;
+    }
+}
+
+/* 动画效果 */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.completed-icon i {
+    animation: pulse 2s infinite;
+}
+
+.usb-icon i {
+    animation: pulse 3s infinite;
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+    .import-progress-modal,
+    .import-completed-dialog {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .progress-bar {
+        background: #4a5568;
+    }
+    
+    .progress-message {
+        background: #2d3748;
+        border-left-color: #4299e1;
+        color: #e2e8f0;
+    }
+    
+    .progress-details {
+        background: #2d3748;
+        border-color: #d69e2e;
+        color: #e2e8f0;
+    }
+    
+    .completed-stats {
+        background: #2d3748;
+        border-bottom-color: #4a5568;
+    }
+    
+    .completed-actions {
+        background: #2d3748;
+    }
+    
+    .image-folder {
+        background: #4a5568;
+        color: #e2e8f0;
+    }
+}

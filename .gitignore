@@ -1,0 +1,7 @@
+MediaGallery/
+runs/
+yoloNumSheepBJUT/results/
+yoloNumSheepNKY/618数据yolo11x1920px.pt
+yoloNumSheepNKY/测试用yolo11x-obb.pt
+yoloNumSheepNKY/原版测试用yolo11x-obb.pt
+yoloNumSheepNKY/yolo11x-obb.engine

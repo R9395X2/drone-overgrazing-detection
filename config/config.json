@@ -1,0 +1,78 @@
+{
+  "directories": {
+    "default": "D:\\CYWRJGDFMJCXT",
+    "alternatives": [
+      "D:\\备用图片目录",
+      "E:\\另一个图片文件夹"
+    ]
+  },
+  "scripts": {
+    "available": [
+      {
+        "id": "yolo_nky",
+        "name": "YOLO羊群检测(NKY版)",
+        "path": "./scripts/script_adapter.py",
+        "description": "北京农林科学院，旋转框标记",
+        "enabled": true,
+        "type": "detection",
+        "options": {
+          "script_type": "yolo_nky"
+        },
+        "outputFields": [
+          "sheep_count",
+          "processed_image",
+          "results_directory"
+        ]
+      },
+      {
+        "id": "yolo_bjut",
+        "name": "YOLO羊群检测(BJUT版)",
+        "path": "./scripts/script_adapter.py",
+        "description": "北京工业大学，中心点标记",
+        "enabled": true,
+        "type": "detection",
+        "options": {
+          "script_type": "yolo_bjut"
+        },
+        "outputFields": [
+          "sheep_count",
+          "processed_image",
+          "results_directory"
+        ]
+      },
+      {
+        "id": "custom_analysis",
+        "name": "自定义分析脚本",
+        "path": "./scripts/script_adapter.py",
+        "description": "您导入的新Python脚本",
+        "enabled": false,
+        "type": "analysis",
+        "options": {
+          "script_type": "custom",
+          "script_path": "./scripts/custom_analysis.py",
+          "analysis_type": "basic",
+          "output_charts": true,
+          "save_results": true
+        },
+        "outputFields": [
+          "analysis_result",
+          "statistics",
+          "charts"
+        ]
+      }
+    ]
+  },
+  "ui": {
+    "defaultView": "grid",
+    "autoLoadDirectory": true,
+    "showProcessingOptions": true,
+    "maxConcurrentProcessing": 3,
+    "enableBatchProcessing": true
+  },
+  "processing": {
+    "timeout": 300,
+    "retryAttempts": 2,
+    "saveOriginalResults": true,
+    "generateThumbnails": true
+  }
+}

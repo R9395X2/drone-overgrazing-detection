@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建盘点-图片计数</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/folder-browser.css">
+    <link rel="stylesheet" href="styles/settings.css">
+    <link rel="stylesheet" href="styles/count.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+<h1><i class="fas fa-calculator"></i> 新建盘点-图片计数</h1>
+<div class="header-actions">
+<button class="btn btn-primary" id="countAllBtn" style="margin-right:12px;">
+    <i class="fas fa-list-ol"></i> 全部图片计数
+</button>
+<button class="btn btn-success" id="finishInventoryBtn" style="margin-right:12px;">
+    <i class="fas fa-check"></i> 完成盘点
+</button>
+<button class="btn btn-secondary" id="backBtn">
+    <i class="fas fa-arrow-left"></i> 返回
+</button>
+<button class="btn btn-secondary" id="settingsBtn" style="margin-left:10px;">
+    <i class="fas fa-cog"></i> 设置
+</button>
+                </div>
+            </div>
+        </header>
+        <main>
+            <div class="count-container">
+                <!-- 左侧文件列表 -->
+                <aside class="count-sidebar">
+                    <h3 style="font-size:1.1em;margin-bottom:12px;">图片文件列表</h3>
+<div class="count-statistics-panel" style="margin-bottom:18px;padding:10px 12px;background:#f7faf7;border-radius:8px;border:1px solid #e0e7e0;">
+    <div id="totalCountInfo" style="font-weight:bold;color:#1a5;">合计：羊：-只，牛：-头</div>
+</div>
+<div class="multi-select-controls" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
+    
+    <button class="btn btn-sm btn-danger" id="deleteSelectedBtn" style="display:none;">
+        <i class="fas fa-trash"></i> 删除所选
+    </button>
+    <span id="selectedCount" style="font-size:13px;color:#888;display:none;"></span>
+</div>
+<ul class="file-list" id="fileList">
+    <!-- 动态加载图片列表 -->
+</ul>
+                </aside>
+                <!-- 中间信息区域 -->
+                <section class="count-info">
+                    <div class="count-info-main">
+                        <h3 style="margin-top:0;">图片信息</h3>
+<div>
+    <span class="info-label">文件名：</span>
+    <span class="info-value" id="infoFileName">-</span>
+</div>
+<div>
+    <span class="info-label">姓名：</span>
+    <span class="info-value" id="infoName">张三</span>
+</div>
+<div>
+    <span class="info-label">拍摄时间：</span>
+    <span class="info-value" id="infoTime">2025-06-21 14:30</span>
+</div>
+<div>
+    <span class="info-label">计数结果：</span>
+    <span class="info-value count-result" id="infoCount">23</span>
+</div>
+<div style="margin-top:12px;">
+    <button class="btn btn-danger" id="deleteCurrentBtn">
+        <i class="fas fa-trash"></i> 删除当前照片
+    </button>
+    <button class="btn btn-info" id="manualCorrectBtn" style="margin-left:12px;">
+        <i class="fas fa-edit"></i> 修正计数结果
+    </button>
+</div>
+<div id="manualCorrectPanel" style="display:none;margin-top:14px;">
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px;">
+        <label>羊数量：<input id="manualSheepInput" type="number" min="0" value="0" style="width:80px;padding:2px 6px;"></label>
+        <label>牛数量：<input id="manualCattleInput" type="number" min="0" value="0" style="width:80px;padding:2px 6px;"></label>
+        <div style="margin-top:8px;">
+            <button id="manualCorrectSaveBtn" class="btn btn-primary" style="margin-right:10px;">保存</button>
+            <button id="manualCorrectCancelBtn" class="btn btn-secondary">取消</button>
+        </div>
+    </div>
+</div>
+                    </div>
+                    <div class="count-info-bottom">
+                        <form id="countOptionsForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:14px;">
+                            <div style="font-size:15px;font-weight:500;margin-bottom:6px;">图片内动物类型</div>
+                            <div class="animal-type-group">
+                                <label class="animal-type-btn" style="margin-right:18px;">
+                                    <input type="radio" name="animalType" value="sheep" checked>
+                                    <span>羊</span>
+                                </label>
+                                <label class="animal-type-btn" style="margin-right:18px;">
+                                    <input type="radio" name="animalType" value="cattle">
+                                    <span>牛</span>
+                                </label>
+                                <label class="animal-type-btn">
+                                    <input type="radio" name="animalType" value="both" id="animalTypeBoth" disabled>
+                                    <span></span>牛羊混合</span>
+                                </label>
+                            </div>
+                            <div style="display:flex;gap:16px;">
+                                <button type="button" class="btn btn-primary" id="directCountBtn" style="width:140px;">
+                                    <i class="fas fa-play"></i> 直接计数
+                                </button>
+                                <button type="button" class="btn btn-warning" id="slideCountBtn" style="width:140px;">
+                                    <i class="fas fa-border-all"></i> 滑窗计数
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+                <!-- 右侧图片区域 -->
+                <section class="count-image-area">
+                    <div class="image-switcher" style="display:flex;align-items:center;justify-content:center;gap:16px;">
+                        <button class="btn btn-sm btn-primary" id="showOriginalBtn">原图</button>
+                        <button class="btn btn-sm btn-secondary" id="showResultBtn">结果图</button>
+                    </div>
+<img id="displayImage" class="count-image" src="" alt="图片展示">
+                </section>
+            </div>
+        </main>
+    </div>
+    <!-- 计数中弹窗 -->
+    <div class="custom-dialog-overlay" id="countingOverlay" style="display:none;">
+        <div class="modal-content settings-modal" style="max-width:340px;padding:0;">
+            <div class="settings-header" style="border-radius:15px 15px 0 0;">
+                <h3 style="margin:0;font-size:1.1rem;display:flex;align-items:center;gap:10px;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    正在计数
+                </h3>
+            </div>
+            <div class="settings-body" style="padding:28px 24px 20px 24px;text-align:center;">
+                <div id="countingMsg" style="font-size:16px;color:#333;margin-bottom:10px;">计数中，请稍候...</div>
+                <div style="margin:18px 0;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:36px;color:#1890ff;"></i>
+                </div>
+                <div id="countingProgressBar" style="width:100%;height:14px;background:#e6f0fa;border-radius:7px;overflow:hidden;margin-bottom:12px;display:none;">
+                    <div id="countingProgressFill" style="height:100%;width:0;background:#1890ff;transition:width 0.3s;border-radius:7px;"></div>
+                </div>
+                <pre id="countingStdout" style="text-align:left;max-height:180px;overflow:auto;background:#f6f8fa;border-radius:7px;padding:10px 14px;font-size:13px;color:#444;margin-bottom:8px;display:none;"></pre>
+                <button id="cancelCountingBtn" class="btn btn-secondary" style="margin-top:10px;">取消</button>
+            </div>
+        </div>
+    </div>
+    <!-- count.html专用设置弹窗 -->
+    <div class="settings-overlay" id="countSettingsOverlay">
+        <div class="settings-modal">
+            <div class="settings-header">
+                <h3>
+                    <i class="fas fa-cog"></i>
+                    计数页面设置
+                </h3>
+                <button class="modal-close" id="closeCountSettingsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-body">
+                <form id="countSettingsForm" autocomplete="off">
+                    <div class="setting-item">
+                        <label for="countThreshold">计数阈值</label>
+                        <input type="number" id="countThreshold" name="countThreshold" class="form-control" min="0" max="100" value="20" placeholder="请输入阈值">
+                        <small>低于该阈值将提示人工复核</small>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label" for="showTips">
+                            <input type="checkbox" id="showTips" checked>
+                            <span>显示操作提示</span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label" for="autoSwitch">
+                            <input type="checkbox" id="autoSwitch">
+                            <span>计数后自动切换到下一张图片</span>
+                        </label>
+                    </div>
+                    <div class="settings-footer">
+                        <button class="btn btn-primary" type="submit">保存</button>
+                        <button class="btn btn-secondary" type="button" id="cancelCountSettingsBtn">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="scripts/image-manager.js"></script>
+    <script src="scripts/count.js"></script>
+<!-- 完成盘点弹窗（采用settings-overlay结构，放在body最外层） -->
+<div class="settings-overlay" id="finishInventoryOverlay">
+    <div class="settings-modal">
+        <div class="settings-header">
+            <h3>
+                <i class="fas fa-tasks"></i>
+                填写本次盘点信息
+            </h3>
+            <button class="modal-close" id="closeFinishInventoryModal">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="settings-body">
+            <form id="finishInventoryForm" autocomplete="off">
+                <div class="setting-item">
+                    <label for="taskName">盘点名称</label>
+                    <input type="text" id="taskName" name="task_name" class="form-control" placeholder="请输入盘点名称" required>
+                </div>
+                <div class="setting-item">
+                    <label for="detectionDate">盘点日期</label>
+                    <input type="date" id="detectionDate" name="detection_date" class="form-control" required>
+                </div>
+                <div class="setting-item">
+                    <label for="pilotName">飞手姓名</label>
+                    <input type="text" id="pilotName" name="pilot_name" class="form-control" placeholder="请输入飞手姓名">
+                </div>
+                <div class="setting-item">
+                    <label for="finishNotes">备注</label>
+                    <textarea id="finishNotes" name="notes" class="form-control" rows="3" placeholder="可填写备注信息"></textarea>
+                </div>
+                <div class="settings-footer">
+                    <button class="btn btn-primary" type="submit">保存盘点</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</body>
+</html>
+                <pre id="countingCmd" style="text-align:left;max-height:120px;overflow:auto;background:#f0f7fa;border-radius:7px;padding:8px 12px;font-size:13px;color:#2a4a6a;margin-bottom:8px;display:none;"></pre>
+                <pre id="countingStdout" style="text-align:left;max-height:180px;overflow:auto;background:#f6f8fa;border-radius:7px;padding:10px 14px;font-size:13px;color:#444;margin-bottom:8px;display:none;"></pre>
+            </div>
+        </div>
+    </div>
+    <!-- count.html专用设置弹窗 -->
+    <div class="settings-overlay" id="countSettingsOverlay">
+        <div class="settings-modal">
+            <div class="settings-header">
+                <h3>
+                    <i class="fas fa-cog"></i>
+                    计数页面设置
+                </h3>
+                <button class="modal-close" id="closeCountSettingsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-body">
+                <form id="countSettingsForm" autocomplete="off">
+                    <div class="setting-item">
+                        <label for="countThreshold">计数阈值</label>
+                        <input type="number" id="countThreshold" name="countThreshold" class="form-control" min="0" max="100" value="20" placeholder="请输入阈值">
+                        <small>低于该阈值将提示人工复核</small>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label" for="showTips">
+                            <input type="checkbox" id="showTips" checked>
+                            <span>显示操作提示</span>
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label class="checkbox-label" for="autoSwitch">
+                            <input type="checkbox" id="autoSwitch">
+                            <span>计数后自动切换到下一张图片</span>
+                        </label>
+                    </div>
+                    <div class="settings-footer">
+                        <button class="btn btn-primary" type="submit">保存</button>
+                        <button class="btn btn-secondary" type="button" id="cancelCountSettingsBtn">取消</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
