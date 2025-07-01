@@ -43,6 +43,7 @@
 ```
 ├── config/           # 配置文件
 ├── database/         # 数据库及相关脚本
+├── MediaGallery/     # 媒体库
 ├── scripts/          # 前端JS脚本
 ├── server/           # Node.js后端服务
 ├── styles/           # 前端样式
