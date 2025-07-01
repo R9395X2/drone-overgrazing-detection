@@ -29,7 +29,6 @@
    ```bash
    pip install -r requirements.txt
    ```
-   （还没弄，先手动安装依赖）
 
 3. 把"618数据yolo11x1920px.pt"放到yoloNumSheepNKY文件夹里
 
