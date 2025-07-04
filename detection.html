@@ -9,18 +9,21 @@
     <link rel="stylesheet" href="styles/device-dialog.css">
     <link rel="stylesheet" href="styles/settings.css">
     <link rel="stylesheet" href="styles/import-progress.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles/fontawesome/all-6.0.0-beta3.min.css">
 </head>
 <body>
     <div class="container">
         <!-- 头部导航 -->
         <header class="header">
-            <div class="header-content">
-                <h1><i class="fas fa-helicopter"></i> 无人机过度放牧检测系统</h1>
-                <div class="header-actions">
-                    <button class="btn btn-success" id="homeBtn" onclick="window.location.href='index.html'">
+<div class="header-content" style="display:flex;align-items:center;gap:12px;">
+    <button class="btn btn-success" id="goHomeBtn" style="margin-right:10px;background:#1a8917;border-color:#1a8917;" onclick="window.location.href='index.html'">
+        <i class="fas fa-home"></i> 返回首页
+    </button>
+    <h1 style="display:inline-block;text-align:left;margin:0;font-size:1.7em;"><i class="fas fa-helicopter"></i> 无人机过度放牧检测系统</h1>
+    <div class="header-actions" style="margin-left:auto;">
+<!-- <button class="btn btn-success" id="homeBtn" onclick="window.location.href='index.html'">
                         <i class="fas fa-home"></i> 回到首页
-                    </button>
+                    </button> -->
                     <button class="btn btn-secondary" id="selectFolderBtn">
                         <i class="fas fa-folder-open"></i> 选择文件夹
                     </button>
@@ -31,7 +34,7 @@
                         <i class="fas fa-edit"></i> 编辑盘点信息
                     </button>
                     <button class="btn btn-success" id="startCountBtnHeader" type="button" style="margin-left:12px;display:none;">
-                        <i class="fas fa-calculator"></i> 开始计数
+                        <i class="fas fa-calculator"></i> <span id="startCountBtnText">开始计数</span>
                     </button>
                 </div>
             </div>
@@ -83,6 +86,9 @@
                     </div>
                     <!-- 多选和删除按钮，靠右 -->
 <div class="multi-select-controls" style="display:flex;gap:12px;align-items:center;margin-left:auto;">
+    <button class="btn btn-sm" id="puzzleViewBtn" title="拼图视图">
+        <i class="fas fa-puzzle-piece"></i> 拼图视图
+    </button>
     <button class="btn btn-sm btn-secondary" id="toggleSelectModeBtn">
         <i class="fas fa-check-square"></i> 选择图片
     </button>
@@ -90,7 +96,6 @@
         <i class="fas fa-trash"></i> 删除所选
     </button>
     <span id="selectedCount" style="font-size:13px;color:#888;display:none;"></span>
-    
 </div>
                 </div>
             </div>
@@ -109,6 +114,26 @@
                     <i class="fas fa-images"></i>
                     <h3>暂无图片</h3>
                     <p>请选择包含图片的文件夹或连接无人机设备</p>
+                </div>
+            </div>
+
+            <!-- 拼图视角容器 -->
+            <div class="puzzle-view" id="puzzleView" style="display: none;">
+                <div class="puzzle-toolbar">
+                    <button class="btn btn-sm" id="exitPuzzleBtn">
+                        <i class="fas fa-times"></i> 退出拼图视图
+                    </button>
+                    <button class="btn btn-sm" id="resetViewBtn">
+                        <i class="fas fa-refresh"></i> 重置视角
+                    </button>
+                    <span class="puzzle-info" id="puzzleInfo">正在加载图片位置信息...</span>
+                </div>
+                <div class="puzzle-canvas-container" id="puzzleCanvasContainer">
+                    <canvas id="puzzleCanvas"></canvas>
+                    <div class="puzzle-loading" id="puzzleLoading">
+                        <div class="spinner"></div>
+                        <p>正在解析图片位置信息...</p>
+                    </div>
                 </div>
             </div>
         </main>
@@ -228,6 +253,7 @@
         </div>
     </div>
     <!-- 按依赖顺序加载模块化的JavaScript文件 -->
+    <script src="scripts/exifr.full.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tiff@0.16.0/dist/tiff.min.js"></script>
     <script src="scripts/notification.js"></script>
     <script src="scripts/loading-manager.js"></script>
@@ -237,6 +263,7 @@
     <script src="scripts/device-detection.js"></script>
     <script src="scripts/import-manager.js"></script>
     <script src="scripts/image-manager.js"></script>
+    <script src="scripts/puzzle-view.js"></script>
     <script src="scripts/settings.js"></script>
     <script src="scripts/app.js"></script>
     
@@ -248,14 +275,21 @@ document.getElementById('startCountBtnHeader')?.addEventListener('click', functi
     const params = new URLSearchParams(window.location.search);
     let farmerId = params.get('farmerId') || params.get('farmer_id');
     let url = 'count.html';
+    let query = [];
     if (farmerId) {
-        url += '?farmerId=' + encodeURIComponent(farmerId);
+        query.push('farmerId=' + encodeURIComponent(farmerId));
+    }
+    // 如果没有back=1参数，则自动带上auto=1
+    if (params.get('back') !== '1') {
+        query.push('auto=1');
+    }
+    if (query.length > 0) {
+        url += '?' + query.join('&');
     }
     window.location.href = url;
 });
 // 页面加载时确保temp_folder及子文件夹创建
 fetch('/api/temp-folder').catch(()=>{});
-// 只有参数中带有farmerId时才显示“选择文件夹”“自动检测设备”“开始计数”按钮，否则隐藏
 (function() {
     function hasParam(names) {
         const search = window.location.search;
@@ -271,6 +305,10 @@ fetch('/api/temp-folder').catch(()=>{});
     ];
     var editBtn = document.getElementById('editCheckInfoBtn');
     var startCountBtnHeader = document.getElementById('startCountBtnHeader');
+    var startCountBtnText = document.getElementById('startCountBtnText');
+    const urlParams = new URLSearchParams(window.location.search);
+    const isBack = urlParams.get('back') === '1';
+
     if (!hasParam(['farmerId', 'farmer_id'])) {
         btns.forEach(function(btn) {
             if (btn) btn.style.display = 'none';
@@ -283,6 +321,34 @@ fetch('/api/temp-folder').catch(()=>{});
         if (editBtn) editBtn.style.display = 'none';
     } else {
         if (editBtn) editBtn.style.display = '';
+    }
+
+    // 仅带farmerId参数时，隐藏status-bar中除imageCount和farmerName外的内容和所有控制按钮
+    if (hasParam(['farmerId']) && !hasParam(['taskId'])) {
+        var currentImagePath = document.getElementById('currentImagePath');
+        var summaryInfo = document.getElementById('summaryInfo');
+        if (currentImagePath) currentImagePath.style.display = 'none';
+        if (summaryInfo) summaryInfo.style.display = 'none';
+        // 隐藏排序和分类选项、视图切换，保留多选和删除按钮
+        var sortFilter = document.querySelector('.sort-filter-controls');
+        var viewToggle = document.querySelector('.view-toggle');
+        if (sortFilter) sortFilter.style.display = 'none';
+        if (viewToggle) viewToggle.style.display = 'none';
+    } else {
+        // 其他情况正常显示
+        var currentImagePath = document.getElementById('currentImagePath');
+        var summaryInfo = document.getElementById('summaryInfo');
+        if (currentImagePath) currentImagePath.style.display = '';
+        if (summaryInfo) summaryInfo.style.display = '';
+        var sortFilter = document.querySelector('.sort-filter-controls');
+        var viewToggle = document.querySelector('.view-toggle');
+        if (sortFilter) sortFilter.style.display = '';
+        if (viewToggle) viewToggle.style.display = '';
+    }
+
+    // 新增：back=1时按钮改名
+    if (isBack && startCountBtnText) {
+        startCountBtnText.textContent = '返回计数页面';
     }
 })();
 </script>

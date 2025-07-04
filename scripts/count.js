@@ -1,75 +1,147 @@
 // count.html 独立JS逻辑
 document.addEventListener('DOMContentLoaded', function() {
 
-    // 修正计数结果按钮事件（面板方式）
-    document.getElementById('manualCorrectBtn')?.addEventListener('click', async function() {
-        // 参考删除当前照片按钮的实现
-        const fileName = document.getElementById('infoFileName')?.textContent?.trim();
-        if (!fileName) {
-            alert('没有图片可修正');
-            return;
-        }
-        const img = images.find(img => img.name === fileName);
-        if (!img) {
-            alert('未找到当前图片');
-            return;
-        }
-        // 获取当前计数结果
-        let sheep = 0;
-        let cattle = 0;
-        try {
-            const res = await fetch(`/api/count/result?fileName=${encodeURIComponent(img.name)}`);
-            const data = await res.json();
-            sheep = (typeof data.sheep_count === 'number') ? data.sheep_count : 0;
-            cattle = (typeof data.cattle_count === 'number') ? data.cattle_count : 0;
-        } catch {}
-        // 显示面板并填充
-        const panel = document.getElementById('manualCorrectPanel');
-        panel.style.display = 'block';
-        document.getElementById('manualSheepInput').value = sheep;
-        document.getElementById('manualCattleInput').value = cattle;
-    });
+    // 初始化嵌入式label-editor
+    let labelEditor = null;
+    function initLabelEditor() {
+        labelEditor = new LabelEditor({
+            embedded: true,
+            readOnly: true,
+            confidenceThreshold: 0.2,
+            onSave: async function(objects) {
+                try {
+                    // 转换为YOLO格式，带置信度
+                    const lines = objects.map(obj => {
+                        const classMap = {
+                            'large-sheep': 0,
+                            'small-sheep': 1,
+                            'large-cattle': 2,
+                            'small-cattle': 3
+                        };
+                        const classId = classMap[obj.type] || 0;
+                        const coords = obj.points.flat().map(coord => coord.toFixed(6));
+                        const conf = (typeof obj.conf === 'number' && !isNaN(obj.conf)) ? obj.conf : 1;
+                        return `${classId} ${coords.join(' ')} ${conf}`;
+                    });
 
-    // 保存修正
-    document.getElementById('manualCorrectSaveBtn')?.addEventListener('click', async function() {
-        // 参考删除当前照片按钮的实现
-        const fileName = document.getElementById('infoFileName')?.textContent?.trim();
-        if (!fileName) return;
-        const img = images.find(img => img.name === fileName);
-        if (!img) return;
-        const sheepVal = document.getElementById('manualSheepInput').value;
-        const cattleVal = document.getElementById('manualCattleInput').value;
-        if (sheepVal === '' || cattleVal === '') {
-            showNotification('请填写完整数量', 'error');
-            return;
-        }
-        // farmerId参数
-        const params = new URLSearchParams(window.location.search);
-        let farmerId = params.get('farmerId') || params.get('farmer_id');
-        // 提交到后端
-        const resp = await fetch('/api/count/manual-correct', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                fileName: img.name,
-                manual_sheep_count: Number(sheepVal),
-                manual_cattle_count: Number(cattleVal),
-                manual_verified: 1,
-                farmer_id: farmerId
-            })
+                    const labelContent = lines.join('\n');
+
+                    // 保存标注文件
+                    const response = await fetch(`/api/count/label?fileName=${encodeURIComponent(labelEditor.fileName)}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'text/plain'
+                        },
+                        body: labelContent
+                    });
+
+                    if (response.ok) {
+                        // 生成结果图
+                        try {
+                            const generateResponse = await fetch('/api/count/generate-result-image', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    fileName: labelEditor.fileName
+                                })
+                            });
+                        } catch (generateError) {
+                            console.warn('生成结果图失败:', generateError);
+                        }
+
+                        // 退出编辑模式并刷新
+                        labelEditor.exitEditMode();
+                        document.getElementById('imageSwitcher').style.display = 'flex';
+                        updateImageAndInfo();
+                        showNotification('标注保存成功', 'success');
+                        return true;
+                    } else {
+                        throw new Error('保存失败');
+                    }
+                } catch (error) {
+                    console.error('保存失败:', error);
+                    showNotification('保存失败: ' + error.message, 'error');
+                    return false;
+                }
+            },
+            onCancel: function() {
+                labelEditor.exitEditMode();
+                document.getElementById('imageSwitcher').style.display = 'flex';
+                showNotification('已取消编辑', 'info');
+            }
         });
-        if (resp.ok) {
-            showNotification('修正结果已保存', 'success');
-            document.getElementById('manualCorrectPanel').style.display = 'none';
-            updateImageAndInfo();
-        } else {
-            showNotification('修正失败', 'error');
+        
+        window.labelEditor = labelEditor;
+        
+        // 设置工具栏按钮事件
+        document.getElementById('saveLabelBtn')?.addEventListener('click', function() {
+            labelEditor.saveLabelsEmbedded();
+        });
+        
+        document.getElementById('cancelLabelBtn')?.addEventListener('click', function() {
+            labelEditor.cancelEdit();
+        });
+    }
+
+    // 编辑标注按钮事件
+    document.getElementById('editLabelBtn')?.addEventListener('click', function() {
+        if (!images.length) {
+            showNotification('没有图片可编辑', 'error');
+            return;
+        }
+        const img = images[currentIndex];
+        if (!img) {
+            showNotification('未找到当前图片', 'error');
+            return;
+        }
+        
+        // 进入编辑模式
+        if (window.labelEditor) {
+            window.labelEditor.enterEditMode();
+            // 隐藏原图/结果图切换按钮
+            document.getElementById('imageSwitcher').style.display = 'none';
         }
     });
 
-    // 取消修正
-    document.getElementById('manualCorrectCancelBtn')?.addEventListener('click', function() {
-        document.getElementById('manualCorrectPanel').style.display = 'none';
+    // 全部设置为羊/牛按钮事件
+    document.getElementById('setAllSheepBtn')?.addEventListener('click', async function() {
+        if (!confirm('确定将所有标注全部设置为羊吗？')) return;
+        try {
+            const resp = await fetch('/api/count/batch-set-labels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'sheep' })
+            });
+            if (resp.ok) {
+                showNotification('全部设置为羊成功', 'success');
+                // 刷新统计和当前图片信息
+                updateImageAndInfo();
+            } else {
+                showNotification('操作失败', 'error');
+            }
+        } catch (e) {
+            showNotification('请求失败: ' + e.message, 'error');
+        }
+    });
+    document.getElementById('setAllCattleBtn')?.addEventListener('click', async function() {
+        if (!confirm('确定将所有标注全部设置为牛吗？')) return;
+        try {
+            const resp = await fetch('/api/count/batch-set-labels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'cattle' })
+            });
+            if (resp.ok) {
+                showNotification('全部设置为牛成功', 'success');
+                updateImageAndInfo();
+            } else {
+                showNotification('操作失败', 'error');
+            }
+        } catch (e) {
+            showNotification('请求失败: ' + e.message, 'error');
+        }
     });
     // 多选与删除功能初始化
     if (window.ImageManager) {
@@ -114,13 +186,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 动态加载图片列表并切换显示
     const fileList = document.getElementById('fileList');
     const displayImage = document.getElementById('displayImage');
-    const showOriginalBtn = document.getElementById('showOriginalBtn');
-    const showResultBtn = document.getElementById('showResultBtn');
-let showingResult = false;
-let images = [];
-let currentIndex = 0;
-window.images = images;
-window.currentIndex = currentIndex;
+    // 已移除 image-switcher 相关变量和按钮
+    let images = [];
+    let currentIndex = 0;
+    window.images = images;
+    window.currentIndex = currentIndex;
 
 function renderFileList() {
     fileList.innerHTML = '';
@@ -160,12 +230,6 @@ function renderFileList() {
             event.stopPropagation();
             currentIndex = idx;
             window.currentIndex = currentIndex;
-            // 切换图片时，若已计数则默认显示结果图，否则显示原图
-            if (images[currentIndex].status === 'completed') {
-                showingResult = true;
-            } else {
-                showingResult = false;
-            }
             renderFileList(); // 重新渲染高亮
             updateImageAndInfo(); // 同步更新信息区
         };
@@ -180,130 +244,198 @@ function updateImageAndInfo() {
     if (!images.length) return;
     const img = images[currentIndex];
 
-    // 根据showingResult状态设置按钮高亮
-    if (showingResult) {
-        showResultBtn.classList.add('btn-primary');
-        showResultBtn.classList.remove('btn-secondary');
-        showOriginalBtn.classList.remove('btn-primary');
-        showOriginalBtn.classList.add('btn-secondary');
-    } else {
-        showOriginalBtn.classList.add('btn-primary');
-        showOriginalBtn.classList.remove('btn-secondary');
-        showResultBtn.classList.remove('btn-primary');
-        showResultBtn.classList.add('btn-secondary');
-    }
-
     // 文件名
     const fileNameSpan = document.getElementById('infoFileName');
     if (fileNameSpan) fileNameSpan.textContent = img.name || '-';
     // 原图和结果图路径
     const originalUrl = img.thumbnail;
-    let resultUrl = originalUrl.replace('/original/', '/result/');
+    // let resultUrl = originalUrl.replace('/original/', '/result/'); // 已移除结果图切换
     // 强制刷新结果图，避免缓存
-    if (showingResult) {
-        resultUrl += (resultUrl.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+    // if (showingResult) {
+    //     resultUrl += (resultUrl.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+    // }
+    
+    // 更新label-editor的图片
+    if (window.labelEditor) {
+        window.labelEditor.loadImageAndLabels(img.name, originalUrl);
     }
-    displayImage.src = showingResult ? resultUrl : originalUrl;
+    
     document.getElementById('infoName').textContent = '张三';
     document.getElementById('infoTime').textContent = img.date || '-';
 
-    // 查询数据库计数结果
+    // === 前端计数逻辑：读取labels并统计 ===
     const params = new URLSearchParams(window.location.search);
     let farmerId = params.get('farmerId') || params.get('farmer_id');
-    let resultApiUrl = `/api/count/result?fileName=${encodeURIComponent(img.name)}`;
-    if (farmerId) resultApiUrl += `&farmerId=${encodeURIComponent(farmerId)}`;
-    fetch(resultApiUrl)
-        .then(res => res.json())
-        .then(data => {
-            // 优先显示人工修正结果
-            let sheep, cattle;
-            if (data.manual_verified === 1) {
-                sheep = (data.manual_sheep_count !== null && data.manual_sheep_count !== undefined) ? data.manual_sheep_count : '-';
-                cattle = (data.manual_cattle_count !== null && data.manual_cattle_count !== undefined) ? data.manual_cattle_count : '-';
-            } else {
-                sheep = (data.sheep_count !== null && data.sheep_count !== undefined) ? data.sheep_count : '-';
-                cattle = (data.cattle_count !== null && data.cattle_count !== undefined) ? data.cattle_count : '-';
-            }
-            // 按钮区域
-            let btnHtml = `
-                <div style="margin:8px 0 0 0;display:flex;gap:8px;">
-                    <button id="setSheepBtn" class="btn btn-sm btn-outline-primary">设为羊结果</button>
-                    <button id="setCattleBtn" class="btn btn-sm btn-outline-primary">设为牛结果</button>
-                    <button id="setMixedBtn" class="btn btn-sm btn-outline-secondary">牛羊混合(开发中)</button>
+    const labelApiUrl = `/api/count/label?fileName=${encodeURIComponent(img.name)}`;
+    fetch(labelApiUrl)
+        .then(res => {
+            if (!res.ok) throw new Error('未找到标注文件');
+            return res.text();
+        })
+        .then(txt => {
+            // 统计各类数量
+            let bigCattle = 0, smallCattle = 0, bigSheep = 0, smallSheep = 0;
+            txt.split('\n').forEach(line => {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 1 && parts[0] !== '') {
+                    if (parts[0] === '0') bigSheep++;
+                    else if (parts[0] === '1') smallSheep++;
+                    else if (parts[0] === '2') bigCattle++;
+                    else if (parts[0] === '3') smallCattle++;
+                }
+            });
+            document.getElementById('infoCount').innerHTML =
+                `<span style="color:#1abc9c;">[前端计数]</span><br>大牛：${bigCattle}头<br>小牛：${smallCattle}头<br>大羊：${bigSheep}只<br>小羊：${smallSheep}只`;
+            document.getElementById('currentFileCountInfo').innerHTML =
+                `<h3 style="margin:0 0 8px 0;">当前图片信息</h3>
+                <div>
+                    <span class="info-label">文件名：</span>
+                    <span class="info-value" id="infoFileName">${img.name || '-'}</span>
                 </div>
-            `;
-            document.getElementById('infoCount').innerHTML = `<br>羊：${sheep}只<br>牛：${cattle}头` + btnHtml;
-            // 按钮事件
+                <div>
+                    <span class="info-label">姓名：</span>
+                    <span class="info-value" id="infoName">张三</span>
+                </div>
+                <div>
+                    <span class="info-label">拍摄时间：</span>
+                    <span class="info-value" id="infoTime">${img.date || '-'}</span>
+                </div>
+                <div>
+                    <span class="info-label">计数结果：</span>
+                    <span class="info-value count-result" id="infoCount"><span style="color:#1abc9c;">[前端计数]</span><br>大牛：${bigCattle}头<br>小牛：${smallCattle}头<br>大羊：${bigSheep}只<br>小羊：${smallSheep}只</span>
+                </div>
+                <div style="margin-top:12px;">
+                    <button class="btn btn-warning" id="setAllSheepBtn" style="margin-right:8px;">全部设置为羊</button>
+                    <button class="btn btn-warning" id="setAllCattleBtn">全部设置为牛</button>
+                </div>
+                <div id="confidenceSliderBox" style="margin-top:18px;">
+                    <label for="confidenceSlider" style="font-weight:bold;">置信度阈值：</label>
+                    <input type="range" id="confidenceSlider" min="0" max="1" step="0.01" value="0.2" style="vertical-align:middle;width:160px;">
+                    <span id="confidenceValue" style="display:inline-block;width:48px;">0.50</span>
+                    <span id="confidenceCount" style="margin-left:18px;color:#e67e22;"></span>
+                </div>`;
+            // 置信度统计逻辑
             setTimeout(() => {
-                const fileName = img.name;
-                document.getElementById('setSheepBtn')?.addEventListener('click', async function() {
-                    // 把当前总数都设为羊，牛为0
-                    let total = 0;
-                    if (typeof data.sheep_count === 'number') total += data.sheep_count;
-                    if (typeof data.cattle_count === 'number') total += data.cattle_count;
-                    await fetch('/api/count/override-result', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileName, sheep_count: total, cattle_count: 0 })
-                    });
-                    updateImageAndInfo();
+                const slider = document.getElementById('confidenceSlider');
+                const valueSpan = document.getElementById('confidenceValue');
+                const countSpan = document.getElementById('confidenceCount');
+                if (!slider || !valueSpan || !countSpan) return;
+                // 解析labels所有置信度
+                let confList = [];
+                txt.split('\n').forEach(line => {
+                    const parts = line.trim().split(/\s+/);
+                    if (parts.length >= 6) {
+                        const conf = parseFloat(parts[parts.length - 1]);
+                        if (!isNaN(conf)) confList.push(conf);
+                    }
                 });
-                document.getElementById('setCattleBtn')?.addEventListener('click', async function() {
-                    // 把当前总数都设为牛，羊为0
-                    let total = 0;
-                    if (typeof data.sheep_count === 'number') total += data.sheep_count;
-                    if (typeof data.cattle_count === 'number') total += data.cattle_count;
-                    await fetch('/api/count/override-result', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ fileName, sheep_count: 0, cattle_count: total })
-                    });
-                    updateImageAndInfo();
-                });
-                document.getElementById('setMixedBtn')?.addEventListener('click', function() {
-                    showNotification('牛羊混合功能开发中', 'info');
-                });
+                function updateConfCount() {
+                    const threshold = parseFloat(slider.value);
+                    valueSpan.textContent = threshold.toFixed(2);
+                    const cnt = confList.filter(c => c >= threshold).length;
+                    countSpan.textContent = `大于该阈值的目标数：${cnt}`;
+                    
+                    // 更新label-editor的置信度阈值
+                    if (window.labelEditor) {
+                        window.labelEditor.setConfidenceThreshold(threshold);
+                    }
+                }
+                slider.oninput = updateConfCount;
+                updateConfCount();
             }, 0);
+            // 重新绑定按钮事件
+            document.getElementById('setAllSheepBtn')?.addEventListener('click', async function() {
+                if (!confirm('确定将所有标注全部设置为羊吗？')) return;
+                try {
+                    const resp = await fetch('/api/count/batch-set-labels', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: 'sheep' })
+                    });
+                    if (resp.ok) {
+                        showNotification('全部设置为羊成功', 'success');
+                        updateImageAndInfo();
+                    } else {
+                        showNotification('操作失败', 'error');
+                    }
+                } catch (e) {
+                    showNotification('请求失败: ' + e.message, 'error');
+                }
+            });
+            document.getElementById('setAllCattleBtn')?.addEventListener('click', async function() {
+                if (!confirm('确定将所有标注全部设置为牛吗？')) return;
+                try {
+                    const resp = await fetch('/api/count/batch-set-labels', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ type: 'cattle' })
+                    });
+                    if (resp.ok) {
+                        showNotification('全部设置为牛成功', 'success');
+                        updateImageAndInfo();
+                    } else {
+                        showNotification('操作失败', 'error');
+                    }
+                } catch (e) {
+                    showNotification('请求失败: ' + e.message, 'error');
+                }
+            });
             // 更新图片状态并刷新文件列表
-            img.status = data.status;
-            renderFileList();
-
             // 统计所有图片的牛羊总数（改为直接请求后端summary接口，确保逻辑一致）
             if (farmerId) {
                 fetch(`/api/count/summary?farmerId=${encodeURIComponent(farmerId)}`)
                     .then(res => res.json())
                     .then(sum => {
-                       document.getElementById('totalCountInfo').innerHTML =
-                            `<b>合计：</b> 羊${sum.sheep_total || 0}只，牛${sum.cattle_total || 0}头`;
+                        document.getElementById('totalCountSummary').innerHTML =
+                            `大牛：${sum.big_cattle_total ?? '-'}头，小牛：${sum.small_cattle_total ?? '-'}头<br>大羊：${sum.big_sheep_total ?? '-'}只，小羊：${sum.small_sheep_total ?? '-'}只`;
+                        document.getElementById('pastureArea').textContent = sum.pasture_area ?? '-';
+                        document.getElementById('artificialPasture').textContent = sum.artificial_pasture ?? '-';
+                        document.getElementById('suitableCapacity').textContent = sum.suitable_capacity ?? '-';
+                        document.getElementById('currentCapacity').textContent = sum.current_capacity ?? '-';
+                        document.getElementById('overloadCapacity').textContent = sum.overload_capacity ?? '-';
+                        // 动态设置超载量颜色
+                        const overloadSpan = document.getElementById('overloadCapacity');
+                        let overload = Number(sum.overload_capacity);
+                        if (!isNaN(overload)) {
+                            if (overload <= 0) {
+                                overloadSpan.style.color = '#1abc1a';
+                            } else {
+                                // 红色递增，最大为#ff2222
+                                let r = 220 + Math.min(35, overload * 5);
+                                let g = 60 - Math.min(40, overload * 4);
+                                r = Math.min(255, r);
+                                g = Math.max(0, g);
+                                overloadSpan.style.color = `rgb(${r},${g},34)`;
+                            }
+                        } else {
+                            overloadSpan.style.color = '';
+                        }
                     });
             }
         })
         .catch(() => {
-            document.getElementById('infoCount').innerHTML = '羊：-只<br>牛：-头';
-            document.getElementById('totalCountInfo').innerHTML = `<b>合计：</b> 羊：-只，牛：-头`;
+            document.getElementById('infoCount').innerHTML = '<span style="color:#1abc9c;">[前端计数]</span><br>大牛：-头<br>小牛：-头<br>大羊：-只<br>小羊：-只';
+            document.getElementById('currentFileCountInfo').innerHTML =
+                `<h3 style="margin:0 0 8px 0;">当前图片信息</h3>
+                <div>
+                    <span class="info-label">文件名：</span>
+                    <span class="info-value" id="infoFileName">-</span>
+                </div>
+                <div>
+                    <span class="info-label">姓名：</span>
+                    <span class="info-value" id="infoName">张三</span>
+                </div>
+                <div>
+                    <span class="info-label">拍摄时间：</span>
+                    <span class="info-value" id="infoTime">-</span>
+                </div>
+                <div>
+                    <span class="info-label">计数结果：</span>
+                    <span class="info-value count-result" id="infoCount"><span style="color:#1abc9c;">[前端计数]</span>大牛：-头<br>小牛：-头<br>大羊：-只<br>小羊：-只</span>
+                </div>`;
+            document.getElementById('totalCountSummary').innerHTML = `大牛：-头，小牛：-头，大羊：-只，小羊：-只`;
         });
 }
-
-    showOriginalBtn.onclick = function() {
-        showingResult = false;
-        showOriginalBtn.classList.add('btn-primary');
-        showOriginalBtn.classList.remove('btn-secondary');
-        showResultBtn.classList.remove('btn-primary');
-        showResultBtn.classList.add('btn-secondary');
-        updateImageAndInfo();
-    };
-    showResultBtn.onclick = function() {
-        showingResult = true;
-        showResultBtn.classList.add('btn-primary');
-        showResultBtn.classList.remove('btn-secondary');
-        showOriginalBtn.classList.remove('btn-primary');
-        showOriginalBtn.classList.add('btn-secondary');
-        updateImageAndInfo();
-    };
-
-    // 默认高亮原图按钮
-    showOriginalBtn.classList.add('btn-primary');
-    showResultBtn.classList.add('btn-secondary');
 
     // 加载图片列表
 fetch('/api/temp-folder')
@@ -329,18 +461,34 @@ fetch('/api/temp-folder')
             currentIndex = 0;
             window.currentIndex = currentIndex;
             renderFileList();
+            // 初始化label-editor
+            initLabelEditor();
+            // 确保初始化后立即刷新图片和canvas
             updateImageAndInfo();
+
+            // 检查auto=1参数，自动计数
+            const autoParam = params.get('auto');
+            if (autoParam === '1' || autoParam === 'true') {
+                setTimeout(() => {
+                    document.getElementById('countAllBtn')?.click();
+                }, 300);
+            }
         } else {
             fileList.innerHTML = '<li style="color:#aaa;">暂无图片</li>';
-            displayImage.src = '';
             document.getElementById('infoName').textContent = '-';
             document.getElementById('infoTime').textContent = '-';
             document.getElementById('infoCount').textContent = '-';
         }
     });
 
-    // 返回按钮带farmerId参数
-    document.getElementById('backBtn')?.addEventListener('click', function() {
+    // 返回首页按钮
+    document.getElementById('goHomeBtn')?.addEventListener('click', function() {
+        window.location.href = 'index.html';
+    });
+
+    // 返回文件导入页面按钮
+    document.getElementById('backToImportBtn')?.addEventListener('click', function() {
+        // 获取farmerId参数
         const params = new URLSearchParams(window.location.search);
         let farmerId = params.get('farmerId') || params.get('farmer_id');
         let url = 'detection.html';
@@ -364,11 +512,10 @@ fetch('/api/temp-folder')
     });
     document.getElementById('finishInventoryForm')?.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const task_name = document.getElementById('taskName').value.trim();
         const detection_date = document.getElementById('detectionDate').value;
         const notes = document.getElementById('finishNotes').value.trim();
         const pilot_name = document.getElementById('pilotName').value.trim();
-        if (!task_name || !detection_date) {
+        if (!detection_date) {
             alert('请填写完整盘点信息');
             return;
         }
@@ -381,7 +528,7 @@ fetch('/api/temp-folder')
             const resp = await fetch('/api/count/finish-inventory', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task_name, detection_date, notes, pilot_name, farmer_id: farmerId })
+                body: JSON.stringify({ detection_date, notes, pilot_name, farmer_id: farmerId })
             });
             const data = await resp.json();
 if (resp.ok && data && data.success) {
@@ -396,14 +543,17 @@ if (resp.ok && data && data.success) {
         }
     });
 
-    // 自动设置盘点日期为今天
+    // 自动设置盘点时间为现在
     const detectionDateInput = document.getElementById('detectionDate');
     if (detectionDateInput && !detectionDateInput.value) {
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        detectionDateInput.value = `${yyyy}-${mm}-${dd}`;
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const min = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        detectionDateInput.value = `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}`;
     }
     document.getElementById('closeCountSettingsModal')?.addEventListener('click', function() {
         document.getElementById('countSettingsOverlay').classList.remove('show');
@@ -483,7 +633,7 @@ if (resp.ok && data && data.success) {
         }
         // 获取animalType
         const form = document.getElementById('countOptionsForm');
-        const animalType = form?.querySelector('input[name="animalType"]:checked')?.value || 'both';
+const animalType = form?.querySelector('input[name="animalType"]:checked')?.value || 'cattle';
 
         showCountingOverlay('正在计数全部图片，请稍候...', true, 0);
         try {
@@ -561,8 +711,15 @@ if (resp.ok && data && data.success) {
                     renderFileList();
                     updateImageAndInfo();
                 }
+                // 计数完成后去掉auto=1参数
                 setTimeout(() => {
                     hideCountingOverlay();
+                    // 去掉auto参数并刷新URL（不刷新页面）
+                    const url = new URL(window.location.href);
+                    if (url.searchParams.has('auto')) {
+                        url.searchParams.delete('auto');
+                        window.history.replaceState(null, '', url.toString());
+                    }
                 }, 400);
             }
         } catch (e) {
@@ -572,163 +729,6 @@ if (resp.ok && data && data.success) {
             }
         }
     });
-
-    // 单张图片计数按钮事件（直接计数）
-    document.getElementById('directCountBtn')?.addEventListener('click', async function() {
-        const form = document.getElementById('countOptionsForm');
-        const animalType = form.querySelector('input[name="animalType"]:checked')?.value || 'both';
-        if (!images.length) {
-            showNotification('没有图片可计数', 'error');
-            return;
-        }
-        // 用图片信息区的文件名查找图片对象
-        const fileName = document.getElementById('infoFileName')?.textContent?.trim();
-        const img = images.find(img => img.name === fileName);
-        if (!img) {
-            showNotification('图片信息区文件名未找到对应图片', 'error');
-            return;
-        }
-        const imgPath = img.path || img.thumbnail || '';
-        if (!imgPath) {
-            showNotification('图片路径无效', 'error');
-            return;
-        }
-        // 结果保存目录推算
-        let outputDir = '';
-        if (imgPath.includes('/original/')) {
-            outputDir = imgPath.replace(/\/original\/.*/, '');
-        } else if (imgPath.includes('\\original\\')) {
-            outputDir = imgPath.replace(/\\original\\.*$/, '');
-        }
-        showCountingOverlay(`正在计数：${img.name}`);
-        try {
-            const resp = await fetch('/api/count/single', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imgPath, outputDir, animalType })
-            });
-            const data = await resp.json();
-            if (document.getElementById('countingOverlay').dataset.cancelled !== 'true') {
-                // 只隐藏弹窗和通知
-                if (resp.ok && data && data.countResult) {
-                    img.processed = true;
-                    img.countResult = data.countResult;
-                    // 重新拉取所有图片的状态，确保前端刷新
-                    await Promise.all(images.map(async imgItem => {
-                        try {
-                            const res = await fetch(`/api/count/result?fileName=${encodeURIComponent(imgItem.name)}`);
-                            const result = await res.json();
-                            imgItem.status = result.status;
-                        } catch (e) {
-                            imgItem.status = null;
-                        }
-                    }));
-                    renderFileList();
-                    updateImageAndInfo();
-                }
-                // 计数完成后自动刷新所有图片的状态和数量（彻底：重新拉取图片列表）
-                try {
-                    const tempResp = await fetch('/api/temp-folder');
-                    const tempData = await tempResp.json();
-                    images = tempData.images || images;
-                    // 计数完成后，补充刷新所有图片的status字段
-                    await Promise.all(images.map(async imgItem => {
-                        try {
-                            const res = await fetch(`/api/count/result?fileName=${encodeURIComponent(imgItem.name)}`);
-                            const result = await res.json();
-                            imgItem.status = result.status;
-                        } catch (e) {
-                            imgItem.status = null;
-                        }
-                    }));
-                    // 保持当前图片高亮
-                    if (images.length > 0) {
-                        // 尝试保持当前图片名
-                        const fileName = document.getElementById('infoFileName')?.textContent?.trim();
-                        let idx = images.findIndex(img => img.name === fileName);
-                        if (idx === -1) idx = 0;
-                        currentIndex = idx;
-                    } else {
-                        currentIndex = 0;
-                    }
-                    renderFileList();
-                    updateImageAndInfo();
-                } catch (e) {
-                    renderFileList();
-                    updateImageAndInfo();
-                }
-                hideCountingOverlay();
-                if (resp.ok) {
-                    showNotification('计数完成！', 'success');
-                } else {
-                    showNotification('计数失败：' + (data && data.error ? data.error : '未知错误'), 'error');
-                }
-            }
-        } catch (e) {
-            if (document.getElementById('countingOverlay').dataset.cancelled !== 'true') {
-                hideCountingOverlay();
-                showNotification('请求失败: ' + e.message, 'error');
-            }
-        }
-    });
-
-    // 滑窗计数按钮事件
-document.getElementById('slideCountBtn')?.addEventListener('click', async function() {
-    if (!images.length) {
-        showNotification('没有图片可计数', 'error');
-        return;
-    }
-    const img = images[currentIndex];
-    const imgPath = img.path || img.thumbnail || '';
-    if (!imgPath) {
-        showNotification('图片路径无效', 'error');
-        return;
-    }
-    // 结果保存目录推算
-    let outputDir = '';
-    if (imgPath.includes('/original/')) {
-        outputDir = imgPath.replace(/\/original\/.*/, '');
-    } else if (imgPath.includes('\\original\\')) {
-        outputDir = imgPath.replace(/\\original\\.*$/, '');
-    }
-    // 获取animalType
-    const form = document.getElementById('countOptionsForm');
-    const animalType = form?.querySelector('input[name="animalType"]:checked')?.value || 'both';
-    showCountingOverlay(`正在滑窗计数：${img.name}`);
-    try {
-        const resp = await fetch('/api/count/slide', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imgPath, outputDir, animalType })
-        });
-        const data = await resp.json();
-        if (document.getElementById('countingOverlay').dataset.cancelled !== 'true') {
-            // 计数完成后，强制刷新所有图片的计数状态和数量
-            await Promise.all(images.map(async imgItem => {
-                try {
-                    const res = await fetch(`/api/count/result?fileName=${encodeURIComponent(imgItem.name)}`);
-                    const result = await res.json();
-                    imgItem.status = result.status;
-                } catch (e) {
-                    imgItem.status = null;
-                }
-            }));
-            renderFileList();
-            updateImageAndInfo();
-            hideCountingOverlay();
-            if (resp.ok) {
-                showNotification('滑窗计数完成！', 'success');
-            } else {
-                showNotification('滑窗计数失败：' + (data && data.error ? data.error : '未知错误'), 'error');
-            }
-        }
-    } catch (e) {
-        if (document.getElementById('countingOverlay').dataset.cancelled !== 'true') {
-            hideCountingOverlay();
-            showNotification('请求失败: ' + e.message, 'error');
-        }
-    }
-});
 
     // 通用通知
     function showNotification(msg, type) {
@@ -747,145 +747,4 @@ document.getElementById('slideCountBtn')?.addEventListener('click', async functi
             setTimeout(() => { div.remove(); }, 2200);
         }
     }
-
-    // 删除当前照片按钮事件
-    const deleteBtn = document.getElementById('deleteCurrentBtn');
-    if (deleteBtn) {
-        console.log('[count.js] 绑定deleteCurrentBtn');
-        deleteBtn.addEventListener('click', async function() {
-            console.log('[count.js] 点击deleteCurrentBtn');
-            if (!images.length) {
-                showNotification('没有图片可删除', 'error');
-                return;
-            }
-            const img = images[currentIndex];
-            if (!img) {
-                showNotification('未找到当前图片', 'error');
-                return;
-            }
-            // 确认删除
-            if (!confirm(`确定要删除图片 "${img.name}" 吗？此操作不可恢复。`)) return;
-            try {
-                // 收集原图、thumb、result三种路径
-                const imagePaths = [];
-                const basePath = img.path || img.thumbnail || img.name;
-                if (basePath) {
-                    imagePaths.push(basePath);
-                    if (basePath.includes('/thumb/')) {
-                        const base = basePath.replace('/thumb/', '/');
-                        imagePaths.push(base.replace(/\/([^\/]+)$/, '/result/$1'));
-                        imagePaths.push(base.replace(/\/([^\/]+)$/, '/original/$1'));
-                    } else if (basePath.includes('/original/')) {
-                        imagePaths.push(basePath.replace('/original/', '/thumb/'));
-                        imagePaths.push(basePath.replace('/original/', '/result/'));
-                    } else if (basePath.includes('/result/')) {
-                        imagePaths.push(basePath.replace('/result/', '/thumb/'));
-                        imagePaths.push(basePath.replace('/result/', '/original/'));
-                    }
-                }
-                const uniquePaths = Array.from(new Set(imagePaths));
-                // 拼接farmerId参数
-                let deleteUrl = '/api/delete-image';
-                const params = new URLSearchParams(window.location.search);
-                let farmerId = params.get('farmerId') || params.get('farmer_id');
-                console.log('[count.js] farmerId:', farmerId);
-                if (farmerId) {
-                    deleteUrl += `?farmerId=${encodeURIComponent(farmerId)}`;
-                }
-                // 调试输出
-                console.log('[删除图片] deleteUrl:', deleteUrl, 'imagePaths:', uniquePaths, 'farmerId:', farmerId);
-                const resp = await fetch(deleteUrl, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ imagePaths: uniquePaths })
-                });
-                if (resp.ok) {
-                    // 删除后刷新图片列表
-                    const tempResp = await fetch('/api/temp-folder');
-                    const tempData = await tempResp.json();
-                    images = tempData.images || [];
-                    // 调整currentIndex
-                    if (images.length > 0) {
-                        currentIndex = Math.min(currentIndex, images.length - 1);
-                    } else {
-                        currentIndex = 0;
-                    }
-                    renderFileList();
-                    updateImageAndInfo();
-                    showNotification('图片已删除', 'success');
-                } else {
-                    showNotification('删除失败', 'error');
-                }
-            } catch (e) {
-                showNotification('删除失败: ' + e.message, 'error');
-            }
-        });
-    }
-
-    // 禁用牛羊混合点击提示
-    const animalTypeBoth = document.getElementById('animalTypeBoth');
-    if (animalTypeBoth) {
-        const label = animalTypeBoth.closest('label');
-        if (label) {
-            label.addEventListener('click', function(e) {
-                e.preventDefault();
-                showNotification('牛羊混合功能还在开发中', 'info');
-            });
-        }
-    }
-
-    // 图片大图预览功能
-    // 创建预览层
-    const previewOverlay = document.createElement('div');
-    previewOverlay.style.cssText = `
-        display:none;position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:99999;
-        background:rgba(0,0,0,0.85);align-items:center;justify-content:center;cursor:grab;
-    `;
-    previewOverlay.id = 'imagePreviewOverlay';
-    previewOverlay.innerHTML = '<img id="previewImg" style="max-width:90vw;max-height:90vh;box-shadow:0 4px 32px #000a;border-radius:10px;transition:transform 0.1s;cursor:grab;">';
-    document.body.appendChild(previewOverlay);
-
-    const previewImg = document.getElementById('previewImg');
-    let scale = 1, originX = 0, originY = 0, startX = 0, startY = 0, dragging = false, imgX = 0, imgY = 0;
-
-    // 点击图片弹出预览
-    displayImage.addEventListener('click', function() {
-        previewImg.src = displayImage.src;
-        scale = 1; imgX = 0; imgY = 0;
-        previewImg.style.transform = 'translate(0px,0px) scale(1)';
-        previewOverlay.style.display = 'flex';
-    });
-
-    // 滚轮缩放
-    previewOverlay.addEventListener('wheel', function(e) {
-        e.preventDefault();
-        let delta = e.deltaY < 0 ? 0.1 : -0.1;
-        scale = Math.min(Math.max(0.2, scale + delta), 8);
-        previewImg.style.transform = `translate(${imgX}px,${imgY}px) scale(${scale})`;
-    }, { passive: false });
-
-    // 鼠标拖动
-    previewImg.addEventListener('mousedown', function(e) {
-        dragging = true;
-        startX = e.clientX - imgX;
-        startY = e.clientY - imgY;
-        previewOverlay.style.cursor = 'grabbing';
-    });
-    document.addEventListener('mousemove', function(e) {
-        if (!dragging) return;
-        imgX = e.clientX - startX;
-        imgY = e.clientY - startY;
-        previewImg.style.transform = `translate(${imgX}px,${imgY}px) scale(${scale})`;
-    });
-    document.addEventListener('mouseup', function() {
-        dragging = false;
-        previewOverlay.style.cursor = 'grab';
-    });
-
-    // 点击遮罩关闭
-    previewOverlay.addEventListener('click', function(e) {
-        if (e.target === previewOverlay) {
-            previewOverlay.style.display = 'none';
-        }
-    });
 });

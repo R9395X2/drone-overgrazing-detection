@@ -13,14 +13,11 @@ CREATE TABLE IF NOT EXISTS farmers (
     town TEXT,                                      -- 乡镇
     village TEXT,                                   -- 村
     detail_address TEXT,                            -- 详细地址
-    sheep_count INTEGER DEFAULT 0,                  -- 羊只数量
-    cattle_count INTEGER DEFAULT 0,                 -- 牛只数量
     horse_count INTEGER DEFAULT 0,                  -- 马数量
     pasture_area DECIMAL(10,2),                     -- 草场面积(亩)
     fodder_area DECIMAL(10,2),                      -- 饲草面积(亩)
     suitable_capacity INTEGER DEFAULT 0,            -- 适宜载畜量
     current_capacity INTEGER DEFAULT 0,             -- 当前载畜量
-    overload INTEGER DEFAULT 0,                     -- 超载量
     notes TEXT,                                     -- 备注
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 创建时间
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP   -- 更新时间
@@ -31,7 +28,7 @@ CREATE TABLE IF NOT EXISTS detection_tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,           -- 主键，自增ID
     farmer_id INTEGER NOT NULL,                     -- 农户ID，关联farmers
     task_name VARCHAR(200),                         -- 任务名称
-    detection_date DATE NOT NULL,                   -- 检测日期
+    detection_date DATETIME NOT NULL,                   -- 检测日期
     media_folder_path TEXT NOT NULL,                -- 媒体文件夹路径
     media_type VARCHAR(50) DEFAULT 'mixed',         -- 媒体类型
     total_files INTEGER DEFAULT 0,                  -- 总文件数
@@ -41,8 +38,13 @@ CREATE TABLE IF NOT EXISTS detection_tasks (
     notes TEXT,                                     -- 备注
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 创建时间
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 更新时间
-    sheep_count INTEGER DEFAULT 0,                  -- 检测羊只数
-    cattle_count INTEGER DEFAULT 0,                 -- 检测牛只数
+    big_sheep_count INTEGER DEFAULT 0,              -- 检测大羊数
+    small_sheep_count INTEGER DEFAULT 0,            -- 检测小羊数
+    big_cattle_count INTEGER DEFAULT 0,             -- 检测大牛数
+    small_cattle_count INTEGER DEFAULT 0,           -- 检测小牛数
+    suitable_capacity INTEGER DEFAULT 0,            -- 适宜载畜量
+    current_capacity INTEGER DEFAULT 0,             -- 当前载畜量
+    overload INTEGER DEFAULT 0,                     -- 超载量
     CONSTRAINT fkey0 FOREIGN KEY (farmer_id) REFERENCES farmers(id) -- 外键，关联farmers
 );
 
@@ -53,12 +55,16 @@ CREATE TABLE IF NOT EXISTS count_results (
     file_name VARCHAR(255) NOT NULL,                -- 文件名
     file_path TEXT NOT NULL,                        -- 文件路径
     algorithm_name VARCHAR(50) NOT NULL,            -- 算法名称
-    sheep_count INTEGER DEFAULT 0,                  -- 检测羊只数
-    cattle_count INTEGER DEFAULT 0,                 -- 检测牛只数
+    big_sheep_count INTEGER DEFAULT 0,              -- 检测大羊数
+    small_sheep_count INTEGER DEFAULT 0,            -- 检测小羊数
+    big_cattle_count INTEGER DEFAULT 0,             -- 检测大牛数
+    small_cattle_count INTEGER DEFAULT 0,           -- 检测小牛数
     status VARCHAR(20) DEFAULT 'pending',           -- 处理状态
     manual_verified BOOLEAN DEFAULT FALSE,          -- 是否人工校验
-    manual_sheep_count INTEGER,                     -- 人工校验羊只数
-    manual_cattle_count INTEGER,                    -- 人工校验牛只数
+    manual_big_sheep_count INTEGER,                 -- 人工校验大羊只数
+    manual_small_sheep_count INTEGER,               -- 人工校验小羊只数
+    manual_big_cattle_count INTEGER,                -- 人工校验大牛只数
+    manual_small_cattle_count INTEGER,              -- 人工校验小牛只数
     notes TEXT,                                     -- 备注
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 创建时间
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 更新时间
@@ -71,12 +77,16 @@ CREATE TABLE IF NOT EXISTS temp_count_results (
     file_name VARCHAR(255) NOT NULL,                -- 文件名
     file_path TEXT NOT NULL,                        -- 文件路径
     algorithm_name VARCHAR(50) DEFAULT 'NKY',       -- 算法名称
-    sheep_count INTEGER,                            -- 检测羊只数
-    cattle_count INTEGER,                           -- 检测牛只数
+    big_sheep_count INTEGER,                        -- 检测大羊数
+    small_sheep_count INTEGER,                      -- 检测小羊数
+    big_cattle_count INTEGER,                       -- 检测大牛数
+    small_cattle_count INTEGER,                     -- 检测小牛数
     status VARCHAR(20) DEFAULT 'pending',           -- 处理状态
     manual_verified BOOLEAN DEFAULT 0,              -- 是否人工校验
-    manual_cattle_count INTEGER,                    -- 人工校验牛只数
-    manual_sheep_count INTEGER,                     -- 人工校验羊只数
+    manual_big_sheep_count INTEGER,                 -- 人工校验大羊只数
+    manual_small_sheep_count INTEGER,               -- 人工校验小羊只数
+    manual_big_cattle_count INTEGER,                -- 人工校验大牛只数
+    manual_small_cattle_count INTEGER,              -- 人工校验小牛只数
     notes TEXT,                                     -- 备注
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- 创建时间
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP   -- 更新时间

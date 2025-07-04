@@ -348,7 +348,7 @@ class ImageManager {
                 const sheep = data.sheep_count !== null && data.sheep_count !== undefined ? data.sheep_count : '-';
                 const cattle = data.cattle_count !== null && data.cattle_count !== undefined ? data.cattle_count : '-';
 
-                // 构造弹窗内容
+                // 构造弹窗内容（增加canvas和标注编辑功能）
                 const modalHtml = `
                     <div style="background:#fff;border-radius:12px;box-shadow:0 4px 32px #0002;padding:48px 48px;max-width:85vw;width:85vw;margin:0 auto;">
                         <div style="font-size:13px;color:#888;text-align:left;margin-bottom:10px;">
@@ -356,17 +356,22 @@ class ImageManager {
                         </div>
                         <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
                             <div>
-                            <div style="font-weight:bold;margin-bottom:6px;">原图</div>
-                            <a href="${originalPath}" target="_blank" title="点击放大原图">
-                                <img src="${originalPath}" alt="原图" style="max-width:500px;max-height:500px;border-radius:6px;border:1px solid #ddd;">
-                            </a>
-                        </div>
-                        <div>
-                            <div style="font-weight:bold;margin-bottom:6px;">结果图</div>
-                            <a href="${resultPath}" target="_blank" title="点击放大结果图">
-                                <img id="modalResultImg" src="${resultPath}" alt="结果图" style="max-width:500px;max-height:500px;border-radius:6px;border:1px solid #ddd;">
-                            </a>
-                            <div id="resultImgPlaceholder" style="display:none;color:#e74c3c;font-size:14px;margin-top:8px;">结果图未生成</div>
+                                <div style="font-weight:bold;margin-bottom:6px;">原图（可编辑标注）</div>
+                                <div style="position:relative;display:inline-block;">
+                                    <img id="editOriginalImg" src="${originalPath}" alt="原图" style="max-width:500px;max-height:500px;border-radius:6px;border:1px solid #ddd;display:block;">
+                                    <canvas id="labelCanvas" style="position:absolute;left:0;top:0;pointer-events:auto;"></canvas>
+                                </div>
+                                <div style="margin-top:10px;">
+                                    <button id="deleteBoxBtn" class="btn btn-danger" style="display:none;">删除选中框</button>
+                                    <span id="labelEditMsg" style="color:#e74c3c;font-size:13px;margin-left:10px;"></span>
+                                </div>
+                            </div>
+                            <div>
+                                <div style="font-weight:bold;margin-bottom:6px;">结果图</div>
+                                <a href="${resultPath}" target="_blank" title="点击放大结果图">
+                                    <img id="modalResultImg" src="${resultPath}" alt="结果图" style="max-width:500px;max-height:500px;border-radius:6px;border:1px solid #ddd;">
+                                </a>
+                                <div id="resultImgPlaceholder" style="display:none;color:#e74c3c;font-size:14px;margin-top:8px;">结果图未生成</div>
                             </div>
                             <div style="min-width:120px;">
                                 <div style="font-weight:bold;margin-bottom:6px;">计数结果</div>
@@ -387,6 +392,125 @@ class ImageManager {
                 }
                 elements.processModal.classList.add('show');
                 document.body.style.overflow = 'hidden';
+
+                // 标注编辑功能
+                setTimeout(() => {
+                    const img = document.getElementById('editOriginalImg');
+                    const canvas = document.getElementById('labelCanvas');
+                    const deleteBtn = document.getElementById('deleteBoxBtn');
+                    const msgSpan = document.getElementById('labelEditMsg');
+                    let boxes = [];
+                    let selectedIdx = -1;
+
+                    function drawBoxes() {
+                        if (!img.complete) return;
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        boxes.forEach((box, i) => {
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.moveTo(box[0][0], box[0][1]);
+                            for (let j = 1; j < 4; ++j) ctx.lineTo(box[j][0], box[j][1]);
+                            ctx.closePath();
+                            ctx.lineWidth = (i === selectedIdx) ? 3 : 2;
+                            ctx.strokeStyle = (i === selectedIdx) ? '#e74c3c' : '#00bfff';
+                            ctx.stroke();
+                            ctx.globalAlpha = 0.15;
+                            ctx.fillStyle = (i === selectedIdx) ? '#e74c3c' : '#00bfff';
+                            ctx.fill();
+                            ctx.globalAlpha = 1.0;
+                            ctx.restore();
+                        });
+                    }
+
+                    function parseYoloObb(txt, imgW, imgH) {
+                        // 每行: class cx cy x1y1 x2y2 x3y3 x4y4 (归一化)
+                        const lines = txt.trim().split('\n').filter(l => l.trim());
+                        return lines.map(line => {
+                            const arr = line.trim().split(/\s+/).map(Number);
+                            // arr[1:9]为8个点，归一化到像素
+                            const pts = [];
+                            for (let i = 1; i <= 8; i += 2) {
+                                pts.push([arr[i] * imgW, arr[i + 1] * imgH]);
+                            }
+                            return pts;
+                        });
+                    }
+
+                    function getBoxAt(x, y) {
+                        // 命中检测：点在多边形内
+                        for (let i = 0; i < boxes.length; ++i) {
+                            const pts = boxes[i];
+                            let inside = false;
+                            for (let j = 0, k = 3; j < 4; k = j++) {
+                                const xi = pts[j][0], yi = pts[j][1];
+                                const xj = pts[k][0], yj = pts[k][1];
+                                if (((yi > y) !== (yj > y)) &&
+                                    (x < (xj - xi) * (y - yi) / (yj - yi + 1e-6) + xi)) {
+                                    inside = !inside;
+                                }
+                            }
+                            if (inside) return i;
+                        }
+                        return -1;
+                    }
+
+                    function saveLabels() {
+                        // 反归一化写回
+                        const lines = boxes.map(pts => {
+                            const norm = pts.map((p, i) => (i % 2 === 0 ? p[0] / img.width : p[1] / img.height));
+                            // 假设class为0，cx/cy可用均值
+                            const cx = norm[0] + (norm[2] - norm[0]) / 2;
+                            const cy = norm[1] + (norm[5] - norm[1]) / 2;
+                            return `0 ${norm[0].toFixed(6)} ${norm[1].toFixed(6)} ${norm[2].toFixed(6)} ${norm[3].toFixed(6)} ${norm[4].toFixed(6)} ${norm[5].toFixed(6)} ${norm[6].toFixed(6)} ${norm[7].toFixed(6)}`;
+                        });
+                        fetch(`/api/count/label?fileName=${encodeURIComponent(fileName)}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: lines.join('\n')
+                        }).then(r => {
+                            if (r.ok) {
+                                msgSpan.textContent = '已保存';
+                                setTimeout(() => { msgSpan.textContent = ''; }, 1200);
+                            } else {
+                                msgSpan.textContent = '保存失败';
+                            }
+                        }).catch(() => {
+                            msgSpan.textContent = '保存失败';
+                        });
+                    }
+
+                    img.onload = () => {
+                        fetch(`/api/count/label?fileName=${encodeURIComponent(fileName)}`)
+                            .then(r => r.ok ? r.text() : '')
+                            .then(txt => {
+                                boxes = parseYoloObb(txt, img.width, img.height);
+                                selectedIdx = -1;
+                                drawBoxes();
+                            });
+                    };
+                    if (img.complete) img.onload();
+
+                    canvas.onmousedown = e => {
+                        const rect = canvas.getBoundingClientRect();
+                        const x = e.clientX - rect.left, y = e.clientY - rect.top;
+                        selectedIdx = getBoxAt(x, y);
+                        drawBoxes();
+                        deleteBtn.style.display = (selectedIdx >= 0) ? '' : 'none';
+                    };
+
+                    deleteBtn.onclick = () => {
+                        if (selectedIdx >= 0) {
+                            boxes.splice(selectedIdx, 1);
+                            selectedIdx = -1;
+                            drawBoxes();
+                            deleteBtn.style.display = 'none';
+                            saveLabels();
+                        }
+                    };
+                }, 0);
             });
     }
 
@@ -397,18 +521,18 @@ class ImageManager {
         // 清除现有选项并添加三选一单选框
         processControls.innerHTML = `
             <h3>处理选项</h3>
-            <label class="radio-label">
-                <input type="radio" name="animalType" value="cow" />
-                <span>该图只有牛</span>
-            </label>
-            <label class="radio-label">
-                <input type="radio" name="animalType" value="sheep" />
-                <span>该图只有羊</span>
-            </label>
-            <label class="radio-label">
-                <input type="radio" name="animalType" value="both" checked />
-                <span>牛羊混合</span>
-            </label>
+<label class="radio-label">
+    <input type="radio" name="animalType" value="cattle" checked />
+    <span>该图只有牛</span>
+</label>
+<label class="radio-label">
+    <input type="radio" name="animalType" value="sheep" />
+    <span>该图只有羊</span>
+</label>
+<label class="radio-label">
+    <input type="radio" name="animalType" value="both" />
+    <span>牛羊混合</span>
+</label>
         `;
     }
 
@@ -1028,11 +1152,15 @@ function updateSummaryInfo(images) {
     if (url) {
         fetch(url)
             .then(res => res.json())
-            .then(data => {
-                const sheepTotal = typeof data.sheep_total === 'number' ? data.sheep_total : '-';
-                const cattleTotal = typeof data.cattle_total === 'number' ? data.cattle_total : '-';
+.then(data => {
+                const bigCattle = typeof data.big_cattle_total === 'number' ? data.big_cattle_total : '-';
+                const smallCattle = typeof data.small_cattle_total === 'number' ? data.small_cattle_total : '-';
+                const bigSheep = typeof data.big_sheep_total === 'number' ? data.big_sheep_total : '-';
+                const smallSheep = typeof data.small_sheep_total === 'number' ? data.small_sheep_total : '-';
                 const pastureArea = typeof data.pasture_area === 'number' ? data.pasture_area : '-';
-                summaryElem.textContent = `合计结果：羊：${sheepTotal}只，牛：${cattleTotal}头  ｜ 羊单元换算系数：${sheepFactor} ｜ 牛单元换算系数：${cattleFactor} ｜ 草场面积：${pastureArea}亩`;
+                const fodderArea = typeof data.fodder_area === 'number' ? data.fodder_area : '-';
+                const overload = typeof data.overload === 'number' ? data.overload : '-';
+                summaryElem.textContent = `合计结果：大牛：${bigCattle}头，小牛：${smallCattle}头，大羊：${bigSheep}只，小羊：${smallSheep}只 ｜ 草场面积：${pastureArea}亩 ｜ 人工饲草地：${fodderArea}亩 ｜ 超载量：${overload}`;
                 // 同步填充姓名
                 if (data.name !== undefined) {
                     const nameElem = document.getElementById('farmerName');
@@ -1040,7 +1168,7 @@ function updateSummaryInfo(images) {
                 }
             })
             .catch(() => {
-                summaryElem.textContent = `合计结果：- ｜ 羊单元换算系数：${sheepFactor} ｜ 牛单元换算系数：${cattleFactor} ｜ 草场面积：-亩`;
+                summaryElem.textContent = `合计结果：- ｜ 草场面积：-亩 ｜ 人工饲草地：-亩 ｜ 超载量：-`;
             });
     } else {
         summaryElem.textContent = `合计结果：- ｜ 羊单元换算系数：${sheepFactor} ｜ 牛单元换算系数：${cattleFactor} ｜ 草场面积：-亩`;

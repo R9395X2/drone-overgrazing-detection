@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>标注编辑器</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/count.css">
+    <link rel="stylesheet" href="styles/fontawesome/all-6.0.0-beta3.min.css">
+    <style>
+        .editor-container {
+            display: flex;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .editor-left {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-right {
+            width: 300px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .image-container {
+            position: relative;
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+        }
+        #editorImage {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        #editorCanvas {
+            position: absolute;
+            left: 0;
+            top: 0;
+            cursor: crosshair;
+        }
+        .tool-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .tool-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tool-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tool-btn:hover {
+            background: #e9ecef;
+        }
+        .tool-btn.active:hover {
+            background: #0056b3;
+        }
+        #addTypeSelector {
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            cursor: pointer;
+        }
+        #addTypeSelector:hover {
+            background: #e9ecef;
+        }
+        #addTypeSelector:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .object-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .object-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .object-item:hover {
+            background: #f8f9fa;
+            border-color: #007bff;
+        }
+        .object-item.selected {
+            background: #e3f2fd;
+            border-color: #007bff;
+        }
+        .object-item.large-sheep {
+            border-left: 4px solid #28a745;
+        }
+        .object-item.small-sheep {
+            border-left: 4px solid #ffc107;
+        }
+        .object-item.large-cattle {
+            border-left: 4px solid #dc3545;
+        }
+        .object-item.small-cattle {
+            border-left: 4px solid #fd7e14;
+        }
+        .stat-color {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        .stat-large-sheep {
+            background: #007bff;
+        }
+        .stat-small-sheep {
+            background: #17a2b8;
+        }
+        .stat-large-cattle {
+            background: #dc3545;
+        }
+        .stat-small-cattle {
+            background: #fd7e14;
+        }
+        .type-selector {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .type-btn {
+            padding: 2px 6px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .type-btn.active {
+            background: #007bff;
+            color: white;
+        }
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover {
+            background: #e9ecef;
+        }
+        .filter-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .stats-panel {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #343a40;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .object-popup {
+            position: absolute;
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+            display: none;
+        }
+        .popup-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        .popup-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .popup-type-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .popup-type-btn:hover {
+            background: #e9ecef;
+        }
+        .popup-type-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .popup-delete-btn {
+            background: #dc3545;
+            color: white;
+            border: 1px solid #dc3545;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .popup-delete-btn:hover {
+            background: #c82333;
+        }
+        .popup-intelligent-btn {
+            flex: 1;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+        }
+        .popup-intelligent-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-container">
+        <div class="editor-left">
+            <div class="tool-bar">
+                <button class="tool-btn active" id="selectTool" data-tool="select">
+                    <i class="fas fa-mouse-pointer"></i> 选择
+                </button>
+                <button class="tool-btn" id="addTool" data-tool="add">
+                    <i class="fas fa-plus"></i> 添加
+                </button>
+                <select class="tool-btn" id="addTypeSelector" style="margin-left: 5px; padding: 6px 8px;">
+                    <option value="large-sheep">大羊</option>
+                    <option value="small-sheep">小羊</option>
+                    <option value="large-cattle">大牛</option>
+                    <option value="small-cattle">小牛</option>
+                </select>
+                <button class="tool-btn" id="deleteTool" data-tool="delete">
+                    <i class="fas fa-trash"></i> 删除
+                </button>
+                <button class="tool-btn" id="undoBtn">
+                    <i class="fas fa-undo"></i> 撤销
+                </button>
+                <button class="tool-btn" id="resetZoomBtn">
+                    <i class="fas fa-search-minus"></i> 重置缩放
+                </button>
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <span>当前工具: <strong id="currentTool">选择</strong></span>
+                    <span>缩放: <strong id="zoomLevel">100%</strong></span>
+                    <button class="btn btn-success btn-sm" id="saveBtn">
+                        <i class="fas fa-save"></i> 保存并返回
+                    </button>
+                    <button class="btn btn-secondary btn-sm" id="backBtn">
+                        <i class="fas fa-arrow-left"></i> 返回
+                    </button>
+                </div>
+            </div>
+            <div class="image-container">
+                <img id="editorImage" src="" alt="编辑图片">
+                <canvas id="editorCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div class="editor-right">
+            <div class="stats-panel">
+                <h4>统计信息</h4>
+                <div><span class="stat-color stat-large-sheep"></span>大羊: <span id="largeSheepCount">0</span></div>
+                <div><span class="stat-color stat-small-sheep"></span>小羊: <span id="smallSheepCount">0</span></div>
+                <div><span class="stat-color stat-large-cattle"></span>大牛: <span id="largeCattleCount">0</span></div>
+                <div><span class="stat-color stat-small-cattle"></span>小牛: <span id="smallCattleCount">0</span></div>
+                <div>总计: <span id="totalCount">0</span></div>
+            </div>
+
+
+            <div style="margin-top: 20px;">
+                <h4>批量操作</h4>
+<button class="btn btn-sm btn-warning" id="clearAllBtn">
+    <i class="fas fa-trash-alt"></i> 清空所有
+</button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 顶部气泡提示 -->
+    <div id="toastContainer" style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+    "></div>
+
+    <script src="scripts/label-editor.js"></script>
+</body>
+</html>

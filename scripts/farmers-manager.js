@@ -253,20 +253,19 @@ class FarmersManager {
         const sortBy = this.elements.sortBy.value;
         filtered.sort((a, b) => {
             switch (sortBy) {
-                case 'name':
-                    return a.name.localeCompare(b.name);
-                case 'recent':
+                case 'last_detection':
                     return new Date(b.last_detection_date || 0) - new Date(a.last_detection_date || 0);
                 case 'sheep_count':
                     return (b.sheep_count || 0) - (a.sheep_count || 0);
                 case 'cattle_count':
                     return (b.cattle_count || 0) - (a.cattle_count || 0);
-                case 'total_livestock':
-                    const totalA = (a.sheep_count || 0) + (a.cattle_count || 0);
-                    const totalB = (b.sheep_count || 0) + (b.cattle_count || 0);
-                    return totalB - totalA;
+                case 'current_capacity':
+                    return (b.current_capacity || 0) - (a.current_capacity || 0);
+                case 'overload':
+                    return (b.overload || 0) - (a.overload || 0);
+                case 'default':
                 default:
-                    return 0;
+                    return 0; // 不排序，保持原顺序
             }
         });
         
@@ -284,38 +283,10 @@ class FarmersManager {
 
         this.showEmptyState(false);
 
-        // 表头
-        const tableHeader = `
-            <thead>
-                <tr>
-                    <th>姓名</th>
-                    <th>联系电话</th>
-                    <th>身份证号</th>
-                    <th>省</th>
-                    <th>市</th>
-                    <th>县</th>
-                    <th>乡</th>
-                    <th>村</th>
-                    <th>详细地址</th>
-                    <th>羊群数量</th>
-                    <th>牛群数量</th>
-                    <th>马数量</th>
-                    <th>草场亩数</th>
-                    <th>人工饲草地亩数</th>
-                    <th>上次检测</th>
-                </tr>
-            </thead>
-        `;
-
-        // 表体
-        const tableBody = `
-            <tbody>
-                ${this.filteredFarmers.map(farmer => this.createFarmerRow(farmer)).join('')}
-            </tbody>
-        `;
-
-        const html = `<table class="farmers-table">${tableHeader}${tableBody}</table>`;
-        this.elements.farmersList.innerHTML = html;
+        const tbody = this.elements.farmersList.querySelector('tbody');
+        if (tbody) {
+            tbody.innerHTML = this.filteredFarmers.map(farmer => this.createFarmerRow(farmer)).join('');
+        }
 
         // 绑定表格行点击事件
         this.bindFarmerRowEvents();
@@ -342,17 +313,17 @@ class FarmersManager {
                         ? (farmer.detail_address.length > 14 ? farmer.detail_address.slice(0, 14) + '…' : farmer.detail_address)
                         : ''
                 }</td>
-                <td>${farmer.sheep_count || 0}</td>
-                <td>${farmer.cattle_count || 0}</td>
-                <td>${farmer.horse_count || 0}</td>
+<td style="width:60px;">${farmer.big_sheep_count !== null && farmer.big_sheep_count !== undefined ? farmer.big_sheep_count : '-'}</td>
+                <td style="width:60px;">${farmer.small_sheep_count !== null && farmer.small_sheep_count !== undefined ? farmer.small_sheep_count : '-'}</td>
+                <td style="width:60px;">${farmer.big_cattle_count !== null && farmer.big_cattle_count !== undefined ? farmer.big_cattle_count : '-'}</td>
+                <td style="width:60px;">${farmer.small_cattle_count !== null && farmer.small_cattle_count !== undefined ? farmer.small_cattle_count : '-'}</td>
+                <td style="width:60px;">${farmer.horse_count || 0}</td>
                 <td>${farmer.pasture_area || 0}</td>
                 <td>${farmer.fodder_area || 0}</td>
+                <td>${farmer.suitable_capacity ?? 0}</td>
+                <td>${farmer.current_capacity ?? 0}</td>
+                <td>${farmer.overload !== null && farmer.overload !== undefined ? farmer.overload : '-'}</td>
                 <td>${lastDetection}</td>
-                <td>${
-                    farmer.notes
-                        ? (farmer.notes.length > 14 ? farmer.notes.slice(0, 14) + '…' : farmer.notes)
-                        : ''
-                }</td>
             </tr>
         `;
     }
@@ -457,8 +428,24 @@ class FarmersManager {
         if (this.elements.farmerTown) this.elements.farmerTown.textContent = farmer.town ? farmer.town : '';
         if (this.elements.farmerVillage) this.elements.farmerVillage.textContent = farmer.village || '';
         if (this.elements.farmerDetailAddress) this.elements.farmerDetailAddress.textContent = farmer.detail_address || '';
-        if (this.elements.farmerSheepCount) this.elements.farmerSheepCount.textContent = `${farmer.sheep_count || 0}只`;
-        if (this.elements.farmerCattleCount) this.elements.farmerCattleCount.textContent = `${farmer.cattle_count || 0}头`;
+        // 用最新检测结果填充 farmer-basic-info 里的大小牛羊数量（必须在检测结果赋值后执行）
+        // 只声明一次变量，避免重复声明
+        let latestBigSheep = 0, latestSmallSheep = 0, latestBigCattle = 0, latestSmallCattle = 0, latestOverload = 0;
+        try {
+            const resp = await fetch(`/api/checks?farmer_id=${farmer.id}&_limit=1&_sort=detection_date:desc`);
+            if (resp.ok) {
+                const tasks = await resp.json();
+                if (tasks && tasks.length > 0) {
+                    latestBigSheep = tasks[0].big_sheep_count ?? 0;
+                    latestSmallSheep = tasks[0].small_sheep_count ?? 0;
+                    latestBigCattle = tasks[0].big_cattle_count ?? 0;
+                    latestSmallCattle = tasks[0].small_cattle_count ?? 0;
+                    latestOverload = tasks[0].overload ?? 0;
+                }
+            }
+        } catch {}
+        if (this.elements.farmerSheepCount) this.elements.farmerSheepCount.textContent = `大羊：${latestBigSheep} 只，小羊：${latestSmallSheep} 只`;
+        if (this.elements.farmerCattleCount) this.elements.farmerCattleCount.textContent = `大牛：${latestBigCattle} 头，小牛：${latestSmallCattle} 头`;
         if (this.elements.farmerHorseCount) this.elements.farmerHorseCount.textContent = `${farmer.horse_count || 0}匹`;
         if (this.elements.farmerPastureArea) this.elements.farmerPastureArea.textContent = `${farmer.pasture_area || 0}亩`;
         if (this.elements.farmerFodderArea) this.elements.farmerFodderArea.textContent = `${farmer.fodder_area || 0}亩`;
@@ -473,25 +460,38 @@ class FarmersManager {
             : '未检测';
         
         // 填充统计信息中的动物数量（用最近一次检测任务结果）
+        // 已在上方声明并赋值 latestBigSheep 等变量，这里无需重复声明和赋值
+
+        // 修正 farmer-stats-section 赋值
         const farmerSheepCountStat = document.getElementById('farmerSheepCountStat');
         const farmerCattleCountStat = document.getElementById('farmerCattleCountStat');
-        let latestSheep = 0;
-        let latestCattle = 0;
-        try {
-            const resp = await fetch(`/api/checks?farmer_id=${farmer.id}&_limit=1&_sort=detection_date:desc`);
-            if (resp.ok) {
-                const tasks = await resp.json();
-                if (tasks && tasks.length > 0) {
-                    latestSheep = tasks[0].sheep_count ?? 0;
-                    latestCattle = tasks[0].cattle_count ?? 0;
-                }
-            }
-        } catch {}
+        const overgrazingRisk = document.getElementById('overgrazingRisk');
         if (farmerSheepCountStat) {
-            farmerSheepCountStat.textContent = latestSheep;
+            const sheepTotal = latestBigSheep + latestSmallSheep;
+            farmerSheepCountStat.textContent = sheepTotal;
+            farmerSheepCountStat.style.color = ""; // 默认色
         }
         if (farmerCattleCountStat) {
-            farmerCattleCountStat.textContent = latestCattle;
+            const cattleTotal = latestBigCattle + latestSmallCattle;
+            farmerCattleCountStat.textContent = cattleTotal;
+            farmerCattleCountStat.style.color = ""; // 默认色
+        }
+        if (overgrazingRisk) {
+            overgrazingRisk.textContent = latestOverload;
+            overgrazingRisk.style.color = getStatColor(latestOverload, 0, 200);
+            // 同时修改label为“超载量”
+            const labelElem = overgrazingRisk.parentElement && overgrazingRisk.parentElement.querySelector('.stat-label');
+            if (labelElem) labelElem.textContent = '超载量';
+        }
+
+        function getStatColor(val, min, max) {
+            // val越大颜色越红，min为绿色，max为红色
+            val = Math.max(min, Math.min(max, val));
+            const percent = (val - min) / (max - min);
+            const r = Math.round(255 * percent);
+            const g = Math.round(80 + 120 * (1 - percent));
+            const b = Math.round(80 + 80 * (1 - percent));
+            return `rgb(${r},${g},${b})`;
         }
 
         this.elements.overgrazingRisk.textContent = this.getRiskText(farmer.overgrazing_risk);
@@ -588,48 +588,50 @@ class FarmersManager {
         const statusText = this.getTaskStatusText(task.status);
         const mediaText = this.getMediaText(task);
         const resultText = this.getResultText(task);
-        
+
+        // 右侧按钮区样式
+        const rightBtnStyle = statusClass === 'completed'
+            ? 'position:absolute;right:45px;top:16px;'
+            : 'margin-left:auto;';
+        const deleteBtnStyle = statusClass === 'completed'
+            ? 'position:absolute;right:20px;top:19px;background:none;border:none;cursor:pointer;color:#e74c3c;font-size:20px;'
+            : 'margin-left:auto;background:none;border:none;cursor:pointer;color:#e74c3c;font-size:20px;';
+
         return `
-            <div class="task-folder-card" data-task-id="${task.id}">
-                <div class="task-status-badge ${statusClass}">${statusText}</div>
+            <div class="task-folder-card" data-task-id="${task.id}" style="position:relative;">
                 <div class="task-folder-header">
-                    <div class="folder-icon">
-                        <i class="fas fa-folder"></i>
+<div class="folder-icon" style="font-size:22px;line-height:1.1;">
+                        📁
                     </div>
                     <div class="task-date-info">
-                        <h5>${task.task_name || '检测任务'}</h5>
-                        <div class="task-date">${task.detection_date ? new Date(task.detection_date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}</div>
+<h5 class="task-date" style="font-size:18px;margin:0 0 2px 0;">${task.detection_date ? new Date(task.detection_date).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}</h5>
+                        <div class="task-pilot" style="font-size:12px;color:#888;margin:0;">${task.pilot_name ? '执法人员：' + task.pilot_name : ''}</div>
                     </div>
-                    <button class="delete-task-btn" title="删除盘点" style="margin-left:auto;background:none;border:none;cursor:pointer;color:#e74c3c;font-size:20px;">
-                        <i class="fas fa-trash"></i>
+                    <div class="task-file-count" style="min-width:80px;max-width:120px;text-align:center;margin-left:12px;padding:2px 10px;background:#f5f5f5;border-radius:6px;font-size:15px;">
+                        <span title="文件数量">文件数量：${task.total_files || 0}</span>
+                    </div>
+<button class="delete-task-btn" title="删除盘点" style="${deleteBtnStyle};font-size:13px;padding:2px 14px;border-radius:12px;background:#e74c3c;color:#fff;border:none;display:inline-block;">
+                        删除
                     </button>
                 </div>
                 <div class="task-summary">
                     <div class="summary-item">
-                        <div class="summary-value">${task.total_files || 0}</div>
-                        <div class="summary-label">文件数量</div>
-                    </div>
-                    <div class="summary-item">
-                        <div class="summary-value">${task.sheep_count ?? '-'}</div>
+                        <div class="summary-value">
+                            <span>大羊:${task.big_sheep_count ?? '-'}</span>
+                            <span style="margin-left:8px;">小羊:${task.small_sheep_count ?? '-'}</span>
+                        </div>
                         <div class="summary-label">羊数量</div>
                     </div>
                     <div class="summary-item">
-                        <div class="summary-value">${task.cattle_count ?? '-'}</div>
+                        <div class="summary-value">
+                            <span>大牛:${task.big_cattle_count ?? '-'}</span>
+                            <span style="margin-left:8px;">小牛:${task.small_cattle_count ?? '-'}</span>
+                        </div>
                         <div class="summary-label">牛数量</div>
                     </div>
-                </div>
-                <div class="task-thumbnails">
-                    <div class="thumbnail-preview">
-                        <i class="fas fa-image"></i>
-                    </div>
-                    <div class="thumbnail-preview">
-                        <i class="fas fa-image"></i>
-                    </div>
-                    <div class="thumbnail-preview">
-                        <i class="fas fa-image"></i>
-                    </div>
-                    <div class="thumbnail-preview more-thumbnails">
-                        +${Math.max(0, (task.total_files || 0) - 3)}
+                    <div class="summary-item">
+                        <div class="summary-value">${task.overload ?? '-'} 羊单位</div>
+                        <div class="summary-label">超载量</div>
                     </div>
                 </div>
             </div>
@@ -797,12 +799,17 @@ class FarmersManager {
         if (this.elements.inputFarmerTown) this.elements.inputFarmerTown.value = farmer.town ?? '';
         if (this.elements.inputFarmerVillage) this.elements.inputFarmerVillage.value = farmer.village ?? '';
         if (this.elements.inputFarmerDetailAddress) this.elements.inputFarmerDetailAddress.value = farmer.detail_address ?? '';
-        if (this.elements.inputSheepCount) this.elements.inputSheepCount.value = (farmer.sheep_count !== undefined && farmer.sheep_count !== null) ? farmer.sheep_count.toString() : '';
-        if (this.elements.inputCattleCount) this.elements.inputCattleCount.value = (farmer.cattle_count !== undefined && farmer.cattle_count !== null) ? farmer.cattle_count.toString() : '';
+        if (this.elements.inputSheepCount) this.elements.inputSheepCount.value = '';
+        if (this.elements.inputCattleCount) this.elements.inputCattleCount.value = '';
         if (this.elements.inputHorseCount) this.elements.inputHorseCount.value = (farmer.horse_count !== undefined && farmer.horse_count !== null) ? farmer.horse_count.toString() : '';
         if (this.elements.inputPastureArea) this.elements.inputPastureArea.value = (farmer.pasture_area !== undefined && farmer.pasture_area !== null) ? farmer.pasture_area.toString() : '';
         if (this.elements.inputFodderArea) this.elements.inputFodderArea.value = (farmer.fodder_area !== undefined && farmer.fodder_area !== null) ? farmer.fodder_area.toString() : '';
         if (this.elements.inputFarmerNotes) this.elements.inputFarmerNotes.value = farmer.notes ?? '';
+        // 新增大小牛羊输入
+        if (document.getElementById('inputBigSheepCount')) document.getElementById('inputBigSheepCount').value = (farmer.big_sheep_count ?? '').toString();
+        if (document.getElementById('inputSmallSheepCount')) document.getElementById('inputSmallSheepCount').value = (farmer.small_sheep_count ?? '').toString();
+        if (document.getElementById('inputBigCattleCount')) document.getElementById('inputBigCattleCount').value = (farmer.big_cattle_count ?? '').toString();
+        if (document.getElementById('inputSmallCattleCount')) document.getElementById('inputSmallCattleCount').value = (farmer.small_cattle_count ?? '').toString();
     }
 
     // 处理农户表单提交
@@ -819,8 +826,10 @@ class FarmersManager {
             town: this.elements.inputFarmerTown ? this.elements.inputFarmerTown.value.trim() : '',
             village: this.elements.inputFarmerVillage ? this.elements.inputFarmerVillage.value.trim() : '',
             detail_address: this.elements.inputFarmerDetailAddress ? this.elements.inputFarmerDetailAddress.value.trim() : '',
-            sheep_count: this.elements.inputSheepCount ? (parseInt(this.elements.inputSheepCount.value) || 0) : 0,
-            cattle_count: this.elements.inputCattleCount ? (parseInt(this.elements.inputCattleCount.value) || 0) : 0,
+            big_sheep_count: document.getElementById('inputBigSheepCount') ? (parseInt(document.getElementById('inputBigSheepCount').value) || 0) : 0,
+            small_sheep_count: document.getElementById('inputSmallSheepCount') ? (parseInt(document.getElementById('inputSmallSheepCount').value) || 0) : 0,
+            big_cattle_count: document.getElementById('inputBigCattleCount') ? (parseInt(document.getElementById('inputBigCattleCount').value) || 0) : 0,
+            small_cattle_count: document.getElementById('inputSmallCattleCount') ? (parseInt(document.getElementById('inputSmallCattleCount').value) || 0) : 0,
             horse_count: this.elements.inputHorseCount ? (parseInt(this.elements.inputHorseCount.value) || 0) : 0,
             pasture_area: this.elements.inputPastureArea ? (parseFloat(this.elements.inputPastureArea.value) || 0) : 0,
             fodder_area: this.elements.inputFodderArea ? (parseFloat(this.elements.inputFodderArea.value) || 0) : 0,

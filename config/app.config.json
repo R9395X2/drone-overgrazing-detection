@@ -14,5 +14,13 @@
     "preserveStructure": true,
     "addTimestamp": false,
     "conflictResolution": "rename"
+  },
+  "labelEditor": {
+    "animalColors": {
+      "large-sheep": "#007bff",
+      "small-sheep": "#17a2b8",
+      "large-cattle": "#dc3545",
+      "small-cattle": "#fd7e14"
+    }
   }
 }

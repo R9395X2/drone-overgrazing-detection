@@ -106,13 +106,17 @@ class DatabaseManager:
 
     # === 农户管理 ===
     def add_farmer(self, name: str, phone: str = None, address: str = None, 
-                   sheep_count: int = 0, pasture_area: float = None, notes: str = None) -> int:
+                   sheep_count: int = 0, big_sheep_count: int = 0, small_sheep_count: int = 0,
+                   cattle_count: int = 0, big_cattle_count: int = 0, small_cattle_count: int = 0,
+                   pasture_area: float = None, notes: str = None) -> int:
         """添加农户"""
         query = """
-        INSERT INTO farmers (name, phone, address, sheep_count, pasture_area, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO farmers (name, phone, address, sheep_count, big_sheep_count, small_sheep_count,
+                             cattle_count, big_cattle_count, small_cattle_count, pasture_area, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
-        return self.insert_and_get_id(query, (name, phone, address, sheep_count, pasture_area, notes))
+        return self.insert_and_get_id(query, (name, phone, address, sheep_count, big_sheep_count, small_sheep_count,
+                                              cattle_count, big_cattle_count, small_cattle_count, pasture_area, notes))
     
     def get_farmers(self) -> List[Dict]:
         """获取所有农户"""
@@ -128,7 +132,8 @@ class DatabaseManager:
         fields = []
         values = []
         for key, value in kwargs.items():
-            if key in ['name', 'phone', 'address', 'sheep_count', 'pasture_area', 'notes']:
+            if key in ['name', 'phone', 'address', 'sheep_count', 'big_sheep_count', 'small_sheep_count',
+                       'cattle_count', 'big_cattle_count', 'small_cattle_count', 'pasture_area', 'notes']:
                 fields.append(f"{key} = ?")
                 values.append(value)
         

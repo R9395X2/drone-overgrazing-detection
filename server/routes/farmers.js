@@ -6,43 +6,70 @@ const path = require('path');
 // 数据库路径
 const DB_PATH = path.join(__dirname, '../../database/drone_detection.db');
 
-// 获取所有农户
+/**
+ * 获取所有农户，并附带每个农户最新检测任务的牛羊数量和超载量
+ */
 router.get('/', async (req, res) => {
     try {
         const db = new sqlite3.Database(DB_PATH);
-        
-        const query = `
+
+        // 查询所有农户基本信息
+        const farmersQuery = `
             SELECT 
                 f.*,
                 COUNT(dt.id) as total_detections,
-                MAX(dt.detection_date) as last_detection_date,
-                COALESCE(AVG(dt.sheep_count), f.sheep_count) as avg_sheep_count,
-                COALESCE(AVG(dt.cattle_count), f.cattle_count) as avg_cattle_count
+                MAX(dt.detection_date) as last_detection_date
             FROM farmers f
             LEFT JOIN detection_tasks dt ON f.id = dt.farmer_id
             GROUP BY f.id
             ORDER BY f.name
         `;
-        
-        db.all(query, [], (err, rows) => {
+
+        db.all(farmersQuery, [], async (err, rows) => {
             if (err) {
                 console.error('查询农户数据失败:', err);
                 res.status(500).json({ error: '查询农户数据失败' });
                 return;
             }
-            
-            // 设置状态
-            const farmers = rows.map(farmer => ({
-                ...farmer,
-                status: farmer.last_detection_date && 
-                       new Date() - new Date(farmer.last_detection_date) < 30 * 24 * 60 * 60 * 1000 
-                       ? 'active' : 'inactive'
+
+            // 并发查询每个农户最新检测任务
+            const getLatestTask = (farmerId) => new Promise((resolve) => {
+                db.get(
+                    `SELECT big_sheep_count, small_sheep_count, big_cattle_count, small_cattle_count, overload
+                     FROM detection_tasks
+                     WHERE farmer_id = ?
+                     ORDER BY detection_date DESC
+                     LIMIT 1`,
+                    [farmerId],
+                    (err, task) => {
+                        if (err) {
+                            resolve({});
+                        } else {
+                            resolve(task || {});
+                        }
+                    }
+                );
+            });
+
+            const farmers = await Promise.all(rows.map(async farmer => {
+                const latestTask = await getLatestTask(farmer.id);
+                return {
+                    ...farmer,
+                    big_sheep_count: latestTask.big_sheep_count ?? null,
+                    small_sheep_count: latestTask.small_sheep_count ?? null,
+                    big_cattle_count: latestTask.big_cattle_count ?? null,
+                    small_cattle_count: latestTask.small_cattle_count ?? null,
+                    overload: latestTask.overload ?? null,
+                    status: farmer.last_detection_date &&
+                        new Date() - new Date(farmer.last_detection_date) < 30 * 24 * 60 * 60 * 1000
+                        ? 'active' : 'inactive'
+                };
             }));
-            
+
             res.json({ farmers });
             db.close();
         });
-        
+
     } catch (error) {
         console.error('获取农户列表失败:', error);
         res.status(500).json({ error: '获取农户列表失败' });
@@ -60,8 +87,8 @@ router.get('/:id', async (req, res) => {
                 f.*,
                 COUNT(dt.id) as total_detections,
                 MAX(dt.detection_date) as last_detection_date,
-                COALESCE(AVG(dt.sheep_count), f.sheep_count) as avg_sheep_count,
-                COALESCE(AVG(dt.cattle_count), f.cattle_count) as avg_cattle_count
+                COALESCE(AVG(dt.big_sheep_count + dt.small_sheep_count), 0) as avg_sheep_count,
+                COALESCE(AVG(dt.big_cattle_count + dt.small_cattle_count), 0) as avg_cattle_count
             FROM farmers f
             LEFT JOIN detection_tasks dt ON f.id = dt.farmer_id
             WHERE f.id = ?
@@ -80,7 +107,14 @@ router.get('/:id', async (req, res) => {
                 return;
             }
             
-            res.json({ farmer: row });
+            // 兼容前端字段
+            const farmer = {
+                ...row,
+                sheep_count: Math.round(row.avg_sheep_count ?? 0),
+                cattle_count: Math.round(row.avg_cattle_count ?? 0)
+            };
+            
+            res.json({ farmer });
             db.close();
         });
         
@@ -96,7 +130,7 @@ router.post('/', async (req, res) => {
         const {
             name, phone, id_card,
             province, city, county, town, village, detail_address,
-            sheep_count, cattle_count, horse_count,
+            big_sheep_count, small_sheep_count, big_cattle_count, small_cattle_count, horse_count,
             pasture_area, fodder_area,
             suitable_capacity, current_capacity, overload,
             notes
@@ -110,8 +144,8 @@ router.post('/', async (req, res) => {
 
         const query = `
             INSERT INTO farmers (
-                name, phone, id_card, province, city, county, town, village, detail_address, sheep_count, cattle_count, horse_count, pasture_area, fodder_area, suitable_capacity, current_capacity, overload, notes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                name, phone, id_card, province, city, county, town, village, detail_address, big_sheep_count, small_sheep_count, big_cattle_count, small_cattle_count, horse_count, pasture_area, fodder_area, suitable_capacity, current_capacity, overload, notes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         db.run(query, [
@@ -124,8 +158,10 @@ router.post('/', async (req, res) => {
             town || null,
             village || null,
             detail_address || null,
-            sheep_count || 0,
-            cattle_count || 0,
+            big_sheep_count || 0,
+            small_sheep_count || 0,
+            big_cattle_count || 0,
+            small_cattle_count || 0,
             horse_count || 0,
             pasture_area || 0,
             fodder_area || 0,
@@ -160,7 +196,7 @@ router.put('/:id', async (req, res) => {
         const {
             name, phone, id_card,
             province, city, county, town, village, detail_address,
-            sheep_count, cattle_count, horse_count,
+            big_sheep_count, small_sheep_count, big_cattle_count, small_cattle_count, horse_count,
             pasture_area, fodder_area,
             suitable_capacity, current_capacity, overload,
             notes
@@ -175,7 +211,7 @@ router.put('/:id', async (req, res) => {
         const query = `
             UPDATE farmers
             SET name = ?, phone = ?, id_card = ?, province = ?, city = ?, county = ?, town = ?, village = ?, detail_address = ?,
-                sheep_count = ?, cattle_count = ?, horse_count = ?, pasture_area = ?, fodder_area = ?, suitable_capacity = ?, current_capacity = ?, overload = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+                big_sheep_count = ?, small_sheep_count = ?, big_cattle_count = ?, small_cattle_count = ?, horse_count = ?, pasture_area = ?, fodder_area = ?, suitable_capacity = ?, current_capacity = ?, overload = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         `;
 
@@ -189,8 +225,10 @@ router.put('/:id', async (req, res) => {
             town || null,
             village || null,
             detail_address || null,
-            sheep_count || 0,
-            cattle_count || 0,
+            big_sheep_count || 0,
+            small_sheep_count || 0,
+            big_cattle_count || 0,
+            small_cattle_count || 0,
             horse_count || 0,
             pasture_area || 0,
             fodder_area || 0,

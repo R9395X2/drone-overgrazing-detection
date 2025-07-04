@@ -8,37 +8,163 @@
     <link rel="stylesheet" href="styles/folder-browser.css">
     <link rel="stylesheet" href="styles/settings.css">
     <link rel="stylesheet" href="styles/count.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles/fontawesome/all-6.0.0-beta3.min.css">
+    <style>
+        /* Label Editor 样式 */
+        .tool-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .tool-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tool-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .tool-btn:hover {
+            background: #e9ecef;
+        }
+        .tool-btn.active:hover {
+            background: #0056b3;
+        }
+        #addTypeSelector {
+            font-size: 14px;
+            font-weight: 500;
+            color: #495057;
+            cursor: pointer;
+        }
+        #addTypeSelector:hover {
+            background: #e9ecef;
+        }
+        #addTypeSelector:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        .object-popup {
+            position: absolute;
+            background: white;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 200px;
+            display: none;
+        }
+        .popup-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        .popup-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .popup-type-btn {
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .popup-type-btn:hover {
+            background: #e9ecef;
+        }
+        .popup-type-btn.active {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .popup-delete-btn {
+            background: #dc3545;
+            color: white;
+            border: 1px solid #dc3545;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .popup-delete-btn:hover {
+            background: #c82333;
+        }
+        /* 右上角颜色提示 */
+        .canvas-legend {
+            position: absolute;
+            top: 12px;
+            right: 18px;
+            z-index: 10;
+            background: rgba(255,255,255,0.92);
+            border-radius: 6px;
+            border: 1px solid #e0e7e0;
+            padding: 4px 10px 4px 10px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px #0001;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .canvas-legend span {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            border-radius: 3px;
+            vertical-align: middle;
+            margin-right: 3px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #ccc;
+        }
+        .legend-big-sheep { background: #007bff; border-color: #007bff;}
+        .legend-small-sheep { background: #17a2b8; border-color: #17a2b8;}
+        .legend-big-cattle { background: #dc3545; border-color: #dc3545;}
+        .legend-small-cattle { background: #fd7e14; border-color: #fd7e14;}
+    </style>
 </head>
 <body>
     <div class="container">
         <header class="header">
-            <div class="header-content">
-<h1><i class="fas fa-calculator"></i> 新建盘点-图片计数</h1>
-<div class="header-actions">
-<button class="btn btn-primary" id="countAllBtn" style="margin-right:12px;">
-    <i class="fas fa-list-ol"></i> 全部图片计数
-</button>
-<button class="btn btn-success" id="finishInventoryBtn" style="margin-right:12px;">
-    <i class="fas fa-check"></i> 完成盘点
-</button>
-<button class="btn btn-secondary" id="backBtn">
-    <i class="fas fa-arrow-left"></i> 返回
-</button>
-<button class="btn btn-secondary" id="settingsBtn" style="margin-left:10px;">
-    <i class="fas fa-cog"></i> 设置
-</button>
-                </div>
-            </div>
+<div class="header-content" style="display:flex;align-items:center;gap:12px;">
+    <button class="btn btn-success" id="goHomeBtn" style="margin-right:10px;background:#1a8917;border-color:#1a8917;">
+        <i class="fas fa-home"></i> 返回首页
+    </button>
+    <button class="btn btn-secondary" id="backToImportBtn" style="margin-right:10px;">
+        <i class="fas fa-arrow-left"></i> 返回文件导入页面
+    </button>
+    <h1 style="display:inline-block;text-align:left;margin:0;font-size:1.7em;"><i class="fas fa-calculator"></i> 新建盘点-图片计数</h1>
+    <div class="header-actions" style="margin-left:auto;">
+        <button class="btn btn-primary" id="countAllBtn" style="margin-right:12px;">
+            <i class="fas fa-list-ol"></i> 全部图片计数
+        </button>
+        <button class="btn btn-success" id="finishInventoryBtn" style="margin-right:12px;">
+            <i class="fas fa-check"></i> 完成盘点
+        </button>
+        <!-- <button class="btn btn-secondary" id="settingsBtn" style="margin-left:10px;">
+            <i class="fas fa-cog"></i> 设置
+        </button> -->
+    </div>
+</div>
         </header>
         <main>
             <div class="count-container">
                 <!-- 左侧文件列表 -->
                 <aside class="count-sidebar">
                     <h3 style="font-size:1.1em;margin-bottom:12px;">图片文件列表</h3>
-<div class="count-statistics-panel" style="margin-bottom:18px;padding:10px 12px;background:#f7faf7;border-radius:8px;border:1px solid #e0e7e0;">
-    <div id="totalCountInfo" style="font-weight:bold;color:#1a5;">合计：羊：-只，牛：-头</div>
-</div>
 <div class="multi-select-controls" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
     
     <button class="btn btn-sm btn-danger" id="deleteSelectedBtn" style="display:none;">
@@ -53,77 +179,96 @@
                 <!-- 中间信息区域 -->
                 <section class="count-info">
                     <div class="count-info-main">
-                        <h3 style="margin-top:0;">图片信息</h3>
-<div>
-    <span class="info-label">文件名：</span>
-    <span class="info-value" id="infoFileName">-</span>
+                        <!-- 上块：全部文件信息 -->
+<div id="totalCountInfo" style="font-weight:bold;margin-bottom:8px;">
+    <h3 style="margin:0 0 8px 0;">全部文件信息合计</h3>
+    <span id="totalCountSummary" style="font-size:18px;color:#1a8917">大牛：-头，小牛：-头，大羊：-只，小羊：-只</span>
+    <div style="font-size:15px;">
+        <span class="info-label">草场面积：</span><span id="pastureArea">-</span> 亩<br>
+        <span class="info-label">人工饲草地：</span><span id="artificialPasture">-</span> 亩<br>
+        <span class="info-label">适宜载畜量：</span><span id="suitableCapacity">-</span> 羊单位<br>
+        <span class="info-label">当前载畜量：</span><span id="currentCapacity">-</span> 羊单位<br>
+        <span style="font-size:20px;font-weight:bold;color:#b32107">
+            超载量：<span id="overloadCapacity">-</span> 羊单位
+        </span>
+    </div>
 </div>
-<div>
-    <span class="info-label">姓名：</span>
-    <span class="info-value" id="infoName">张三</span>
-</div>
-<div>
-    <span class="info-label">拍摄时间：</span>
-    <span class="info-value" id="infoTime">2025-06-21 14:30</span>
-</div>
-<div>
-    <span class="info-label">计数结果：</span>
-    <span class="info-value count-result" id="infoCount">23</span>
-</div>
-<div style="margin-top:12px;">
-    <button class="btn btn-danger" id="deleteCurrentBtn">
-        <i class="fas fa-trash"></i> 删除当前照片
-    </button>
-    <button class="btn btn-info" id="manualCorrectBtn" style="margin-left:12px;">
-        <i class="fas fa-edit"></i> 修正计数结果
-    </button>
-</div>
-<div id="manualCorrectPanel" style="display:none;margin-top:14px;">
-    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:10px;">
-        <label>羊数量：<input id="manualSheepInput" type="number" min="0" value="0" style="width:80px;padding:2px 6px;"></label>
-        <label>牛数量：<input id="manualCattleInput" type="number" min="0" value="0" style="width:80px;padding:2px 6px;"></label>
-        <div style="margin-top:8px;">
-            <button id="manualCorrectSaveBtn" class="btn btn-primary" style="margin-right:10px;">保存</button>
-            <button id="manualCorrectCancelBtn" class="btn btn-secondary">取消</button>
-        </div>
+                        <hr style="border:none;border-top:1.5px solid #e0e7e0;margin:12px 0 18px 0;">
+                        <!-- 下块：当前文件信息 -->
+<div id="currentFileCountInfo" style="margin-bottom:18px;">
+    <h3 style="margin:0 0 8px 0;">当前图片信息</h3>
+    <div>
+        <span class="info-label">文件名：</span>
+        <span class="info-value" id="infoFileName">-</span>
+    </div>
+    <div>
+        <span class="info-label">姓名：</span>
+        <span class="info-value" id="infoName">张三</span>
+    </div>
+    <div>
+        <span class="info-label">拍摄时间：</span>
+        <span class="info-value" id="infoTime">2025-06-21 14:30</span>
+    </div>
+    <div>
+        <span class="info-label">计数结果：</span>
+        <span class="info-value count-result" id="infoCount">23</span>
+    </div>
+    <div style="margin-top:12px;">
+        <button class="btn btn-warning" id="setAllSheepBtn" style="margin-right:8px;">全部设置为羊</button>
+        <button class="btn btn-warning" id="setAllCattleBtn">全部设置为牛</button>
     </div>
 </div>
                     </div>
-                    <div class="count-info-bottom">
-                        <form id="countOptionsForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:14px;">
-                            <div style="font-size:15px;font-weight:500;margin-bottom:6px;">图片内动物类型</div>
-                            <div class="animal-type-group">
-                                <label class="animal-type-btn" style="margin-right:18px;">
-                                    <input type="radio" name="animalType" value="sheep" checked>
-                                    <span>羊</span>
-                                </label>
-                                <label class="animal-type-btn" style="margin-right:18px;">
-                                    <input type="radio" name="animalType" value="cattle">
-                                    <span>牛</span>
-                                </label>
-                                <label class="animal-type-btn">
-                                    <input type="radio" name="animalType" value="both" id="animalTypeBoth" disabled>
-                                    <span></span>牛羊混合</span>
-                                </label>
-                            </div>
-                            <div style="display:flex;gap:16px;">
-                                <button type="button" class="btn btn-primary" id="directCountBtn" style="width:140px;">
-                                    <i class="fas fa-play"></i> 直接计数
-                                </button>
-                                <button type="button" class="btn btn-warning" id="slideCountBtn" style="width:140px;">
-                                    <i class="fas fa-border-all"></i> 滑窗计数
-                                </button>
-                            </div>
-                        </form>
+                    <div style="margin-top:12px;">
+                        <button class="btn btn-info" id="editLabelBtn">
+                            <i class="fas fa-edit"></i> 修正计数结果
+                        </button>
                     </div>
                 </section>
                 <!-- 右侧图片区域 -->
                 <section class="count-image-area">
-                    <div class="image-switcher" style="display:flex;align-items:center;justify-content:center;gap:16px;">
-                        <button class="btn btn-sm btn-primary" id="showOriginalBtn">原图</button>
-                        <button class="btn btn-sm btn-secondary" id="showResultBtn">结果图</button>
+                  <!-- 图片容器，使用label-editor的结构 -->
+                    <div class="image-container" style="position:relative;flex:1;border:1px solid #ddd;border-radius:8px;overflow:hidden;background:#000;min-height:400px;margin-top:10px;">
+                        <!-- 编辑模式工具栏 -->
+                        <div class="tool-bar" id="labelToolBar" style="display:none;position:absolute;top:10px;left:-5px;z-index:20;padding:6px 10px 6px 10px;background:#f8f9fa;border-radius:8px;gap:7px;flex-wrap:wrap;box-shadow:0 2px 8px #0002;font-size:13px;transform:scale(0.92);">
+                            <button class="tool-btn active" id="selectTool" data-tool="select" style="font-size:13px;padding:5px 10px;">
+                                <i class="fas fa-mouse-pointer"></i> 选择
+                            </button>
+                            <button class="tool-btn" id="addTool" data-tool="add" style="font-size:13px;padding:5px 10px;">
+                                <i class="fas fa-plus"></i> 添加
+                            </button>
+                            <select class="tool-btn" id="addTypeSelector" style="padding:5px 8px;font-size:13px;">
+                                <option value="large-sheep">大羊</option>
+                                <option value="small-sheep">小羊</option>
+                                <option value="large-cattle">大牛</option>
+                                <option value="small-cattle">小牛</option>
+                            </select>
+                            <button class="tool-btn" id="undoBtn" style="font-size:13px;padding:5px 10px;">
+                                <i class="fas fa-undo"></i> 撤销
+                            </button>
+                            <button class="tool-btn" id="resetZoomBtn" style="font-size:13px;padding:5px 10px;">
+                                <i class="fas fa-search-minus"></i> 重置缩放
+                            </button>
+                            <div style="margin-left:10px;display:flex;gap:7px;align-items:center;">
+                                <span>缩放: <strong id="zoomLevel">100%</strong></span>
+                                <button class="btn btn-success btn-sm" id="saveLabelBtn" style="font-size:13px;padding:5px 14px;">
+                                    </i> 保存
+                                </button>
+                                <button class="btn btn-secondary btn-sm" id="cancelLabelBtn" style="font-size:13px;padding:5px 14px;">
+                                    </i> 取消
+                                </button>
+                            </div>
+                        </div>
+                        <!-- 右上角颜色提示 -->
+                        <div class="canvas-legend" id="canvasLegend">
+                            <span class="legend-big-sheep"></span>大羊
+                            <span class="legend-small-sheep"></span>小羊
+                            <span class="legend-big-cattle"></span>大牛
+                            <span class="legend-small-cattle"></span>小牛
+                        </div>
+                        <img id="editorImage" style="width:100%;height:100%;object-fit:contain;display:block;" src="" alt="图片展示">
+                        <canvas id="editorCanvas" style="position:absolute;left:0;top:0;cursor:crosshair;"></canvas>
                     </div>
-<img id="displayImage" class="count-image" src="" alt="图片展示">
                 </section>
             </div>
         </main>
@@ -189,8 +334,39 @@
             </div>
         </div>
     </div>
-    <script src="scripts/image-manager.js"></script>
+    <!-- 顶部气泡提示容器 -->
+    <div id="toastContainer" style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+    "></div>
+
+    <script src="scripts/notification.js"></script>
+    <script src="scripts/label-editor.js"></script>
     <script src="scripts/count.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+    var backBtn = document.getElementById('backToImportBtn');
+    if (backBtn) {
+        backBtn.onclick = function() {
+            // 获取farmerId参数
+            var params = new URLSearchParams(window.location.search);
+            var farmerId = params.get('farmerId') || params.get('farmer_id');
+            var url = 'detection.html';
+            var query = [];
+            if (farmerId) {
+                query.push('farmerId=' + encodeURIComponent(farmerId));
+            }
+            query.push('back=1');
+            if (query.length > 0) {
+                url += '?' + query.join('&');
+            }
+            window.location.href = url;
+        };
+    }
+});
+</script>
 <!-- 完成盘点弹窗（采用settings-overlay结构，放在body最外层） -->
 <div class="settings-overlay" id="finishInventoryOverlay">
     <div class="settings-modal">
@@ -206,16 +382,12 @@
         <div class="settings-body">
             <form id="finishInventoryForm" autocomplete="off">
                 <div class="setting-item">
-                    <label for="taskName">盘点名称</label>
-                    <input type="text" id="taskName" name="task_name" class="form-control" placeholder="请输入盘点名称" required>
+                    <label for="detectionDate">盘点时间</label>
+                    <input type="datetime-local" id="detectionDate" name="detection_date" class="form-control" required>
                 </div>
                 <div class="setting-item">
-                    <label for="detectionDate">盘点日期</label>
-                    <input type="date" id="detectionDate" name="detection_date" class="form-control" required>
-                </div>
-                <div class="setting-item">
-                    <label for="pilotName">飞手姓名</label>
-                    <input type="text" id="pilotName" name="pilot_name" class="form-control" placeholder="请输入飞手姓名">
+                    <label for="pilotName">执法人员</label>
+                    <input type="text" id="pilotName" name="pilot_name" class="form-control" placeholder="请输入执法人员姓名">
                 </div>
                 <div class="setting-item">
                     <label for="finishNotes">备注</label>
@@ -275,3 +447,5 @@
         </div>
     </div>
 </body>
+
+</final_file_content>
